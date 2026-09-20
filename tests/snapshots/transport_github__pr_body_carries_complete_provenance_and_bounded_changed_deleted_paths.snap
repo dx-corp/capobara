@@ -1,0 +1,61 @@
+---
+source: tools/capobara/tests/transport_github.rs
+assertion_line: 203
+expression: body
+---
+<!-- repository-projection: {"schemaVersion":1,"projection":"sample","projectionSchemaVersion":1,"sourceRepository":"dx-corp/mono","sourceSha":"1111111111111111111111111111111111111111","destinationRepository":"dx-corp/sample","priorProjectedBase":"2222222222222222222222222222222222222222","definitionDigest":"3333333333333333333333333333333333333333333333333333333333333333","toolDigest":"4444444444444444444444444444444444444444444444444444444444444444","contentDigest":"5555555555555555555555555555555555555555555555555555555555555555","publicationEligible":true} -->
+
+## sample projection
+
+Mono source: dx-corp/mono@1111111111111111111111111111111111111111.
+Prior destination base: 2222222222222222222222222222222222222222.
+Projected content SHA-256: 5555555555555555555555555555555555555555555555555555555555555555.
+
+25 changed; 25 deleted.
+
+- copy/update c0
+- copy/update c1
+- copy/update c2
+- copy/update c3
+- copy/update c4
+- copy/update c5
+- copy/update c6
+- copy/update c7
+- copy/update c8
+- copy/update c9
+- copy/update c10
+- copy/update c11
+- copy/update c12
+- copy/update c13
+- copy/update c14
+- copy/update c15
+- copy/update c16
+- copy/update c17
+- copy/update c18
+- copy/update c19
+- delete d0
+- delete d1
+- delete d2
+- delete d3
+- delete d4
+- delete d5
+- delete d6
+- delete d7
+- delete d8
+- delete d9
+- delete d10
+- delete d11
+- delete d12
+- delete d13
+- delete d14
+- delete d15
+- delete d16
+- delete d17
+- delete d18
+- delete d19
+
+Mono owns projected source. Destination-owned CI and policy are preserved.
+Apply the sync-hold label to this PR to suspend generated updates during intentional destination work.
+Source-side verification does not establish destination CI health. Review destination checks before merging.
+
+Change-Origin: generated

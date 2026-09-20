@@ -1,0 +1,113 @@
+[package]
+name = "capobara"
+version = "0.1.0"
+edition = "2024"
+license = "BUSL-1.1"
+rust-version = "1.95"
+publish = false
+description = "Publishes deterministic projections of Mono into standalone repositories."
+repository = "https://github.com/dx-corp/capobara"
+autotests = false
+build = "build.rs"
+
+[features]
+mono-fixtures = []
+recorded-api = []
+
+[[bin]]
+name = "capobara"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive", "env"] }
+hex = "0.4"
+regex = "1.13"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.14"
+thiserror = "2.0"
+
+[dev-dependencies]
+insta = { version = "1.48", features = ["json"] }
+pretty_assertions = "1.4"
+
+[lints.rust]
+non_ascii_idents = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
+unused_lifetimes = "warn"
+
+[lints.clippy]
+await_holding_lock = "deny"
+dbg_macro = "deny"
+disallowed_methods = "deny"
+empty_drop = "deny"
+exit = "deny"
+filetype_is_file = "deny"
+fn_to_numeric_cast_any = "deny"
+lossy_float_literal = "deny"
+mem_forget = "deny"
+mutex_atomic = "deny"
+rc_buffer = "deny"
+rest_pat_in_fully_bound_structs = "deny"
+string_add = "deny"
+string_lit_as_bytes = "deny"
+todo = "deny"
+unchecked_time_subtraction = "deny"
+undocumented_unsafe_blocks = "deny"
+verbose_file_reads = "deny"
+
+[[test]]
+name = "build"
+path = "tests/build.rs"
+
+[[test]]
+name = "catalog"
+path = "tests/catalog.rs"
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+
+[[test]]
+name = "equivalence"
+path = "tests/equivalence.rs"
+
+[[test]]
+name = "definition_coverage"
+path = "tests/definition_coverage.rs"
+
+[[test]]
+name = "project_cli"
+path = "tests/project_cli.rs"
+
+[[test]]
+name = "snapshot"
+path = "tests/snapshot.rs"
+
+[[test]]
+name = "sdk_assembly"
+path = "tests/sdk_assembly.rs"
+
+[[test]]
+name = "transport_git"
+path = "tests/transport_git.rs"
+required-features = ["recorded-api"]
+
+[[test]]
+name = "standalone_build"
+path = "tests/standalone_build.rs"
+
+[[test]]
+name = "transport_github"
+path = "tests/transport_github.rs"
+required-features = ["recorded-api"]
+
+[[test]]
+name = "run_cli"
+path = "tests/run_cli.rs"
+required-features = ["recorded-api"]

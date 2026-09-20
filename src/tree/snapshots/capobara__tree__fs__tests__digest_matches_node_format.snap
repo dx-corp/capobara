@@ -1,0 +1,6 @@
+---
+source: tools/capobara/src/tree/fs.rs
+assertion_line: 172
+expression: tree_digest(&entries)
+---
+98b3c58790e4620dce413ec843332f4c4b534e20cbb943a706b82c433afa9ba5
