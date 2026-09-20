@@ -1,0 +1,6 @@
+---
+source: tools/capobara/src/definition.rs
+assertion_line: 463
+expression: definition_digest(&api.raw)
+---
+1b99f898b612f6adeb8261ebea5314f7e78f0d41d4667ce98cb9bb94155369f4
