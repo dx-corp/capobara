@@ -13,4 +13,5 @@ pub mod snapshot;
 pub mod tooldigest;
 pub mod transport;
 pub mod tree;
+pub mod vendor;
 pub use error::{Error, Result, contract, invalid};

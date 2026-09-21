@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
@@ -7,6 +8,7 @@ use capobara::cli::catalog::CatalogCommand;
 use capobara::cli::project::ProjectCommand;
 use capobara::cli::run::RunArgs;
 use capobara::cli::transport::{PrepareArgs, ReportArgs};
+use capobara::cli::vendor::VendorCliArgs;
 
 #[derive(Parser)]
 #[command(
@@ -40,6 +42,9 @@ enum Command {
     Verify(ProjectCliArgs),
     /// Report drift between source and destination.
     Check(ProjectCliArgs),
+    /// Verify a vendored upstream tree against its pinned commit.
+    #[command(subcommand)]
+    Vendor(VendorCommand),
     /// Clone-side preparation of the destination branch.
     Prepare(PrepareArgs),
     /// Recheck a prepared projection before publication.
@@ -106,7 +111,7 @@ fn exit_catalog(result: capobara::Result<()>) -> ! {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Plan(args) => {
@@ -139,5 +144,24 @@ fn main() {
         Command::Preflight(args) => exit_transport(capobara::cli::transport::preflight(args)),
         Command::Publish(args) => exit_transport(capobara::cli::transport::publish(args)),
         Command::Run(args) => exit_transport(capobara::cli::run::run(args)),
+        Command::Vendor(VendorCommand::Check(args)) => {
+            exit_vendor(capobara::cli::vendor::check(args))
+        }
+    }
+}
+
+#[derive(Subcommand)]
+enum VendorCommand {
+    /// Report divergence between a vendored tree and its pinned upstream commit.
+    Check(VendorCliArgs),
+}
+
+fn exit_vendor(result: capobara::Result<capobara::vendor::VendorReport>) -> ExitCode {
+    match result {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(u8::try_from(error.exit_code()).expect("capobara exit codes fit in u8"))
+        }
     }
 }
