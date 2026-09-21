@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
@@ -110,7 +111,7 @@ fn exit_catalog(result: capobara::Result<()>) -> ! {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Plan(args) => {
@@ -144,7 +145,7 @@ fn main() {
         Command::Publish(args) => exit_transport(capobara::cli::transport::publish(args)),
         Command::Run(args) => exit_transport(capobara::cli::run::run(args)),
         Command::Vendor(VendorCommand::Check(args)) => {
-            exit_vendor(capobara::cli::vendor::check(args));
+            exit_vendor(capobara::cli::vendor::check(args))
         }
     }
 }
@@ -155,12 +156,12 @@ enum VendorCommand {
     Check(VendorCliArgs),
 }
 
-fn exit_vendor(result: capobara::Result<capobara::vendor::VendorReport>) {
+fn exit_vendor(result: capobara::Result<capobara::vendor::VendorReport>) -> ExitCode {
     match result {
-        Ok(_) => std::process::exit(0),
+        Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");
-            std::process::exit(error.exit_code());
+            ExitCode::from(u8::try_from(error.exit_code()).expect("capobara exit codes fit in u8"))
         }
     }
 }

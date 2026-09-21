@@ -265,23 +265,11 @@ pub fn check(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
+    use crate::git::test_git_bytes;
     use tempfile::TempDir;
 
     fn run(dir: &Path, args: &[&str]) {
-        let status = Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(args)
-            .env("GIT_AUTHOR_NAME", "t")
-            .env("GIT_AUTHOR_EMAIL", "t@example.invalid")
-            .env("GIT_COMMITTER_NAME", "t")
-            .env("GIT_COMMITTER_EMAIL", "t@example.invalid")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_SYSTEM", "/dev/null")
-            .status()
-            .expect("git");
-        assert!(status.success(), "git {args:?} failed");
+        test_git_bytes(dir, args).expect("scratch git command succeeds");
     }
 
     fn write(dir: &Path, rel: &str, contents: &str) {
@@ -293,13 +281,10 @@ mod tests {
     fn commit_all(dir: &Path, message: &str) -> String {
         run(dir, &["add", "-A"]);
         run(dir, &["commit", "-q", "-m", message]);
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .unwrap();
-        String::from_utf8(out.stdout).unwrap().trim().to_owned()
+        String::from_utf8(test_git_bytes(dir, &["rev-parse", "HEAD"]).unwrap())
+            .unwrap()
+            .trim()
+            .to_owned()
     }
 
     struct Fixture {
@@ -357,6 +342,12 @@ mod tests {
     #[test]
     fn faithful_vendor_is_clean() {
         let f = fixture();
+        let author =
+            test_git_bytes(f.upstream.path(), &["log", "-1", "--format=%an <%ae>"]).unwrap();
+        assert_eq!(
+            String::from_utf8(author).unwrap().trim(),
+            "t <t@example.invalid>"
+        );
         let def = definition(&f.commit, &[]);
         let report = check(f.mono.path(), "HEAD", f.upstream.path(), &def).unwrap();
         assert!(report.clean(), "{:?}", report.drift);
