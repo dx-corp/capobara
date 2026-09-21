@@ -138,11 +138,11 @@ fn write_report(path: &Path, report: &Report) {
     std::fs::write(path, serde_json::to_string(report).unwrap()).unwrap();
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test executes the capobara binary"
-)]
 fn capobara() -> Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test executes the capobara binary"
+    )]
     Command::new(env!("CARGO_BIN_EXE_capobara"))
 }
 
@@ -184,11 +184,11 @@ fn run_capobara(
     );
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration tests drive scratch git repositories outside the support::Repo helper"
-)]
 fn run_git(path: &Path, args: &[&str]) -> String {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration tests drive scratch git repositories outside the support::Repo helper"
+    )]
     let out = Command::new("git")
         .arg("-C")
         .arg(path)
@@ -203,11 +203,11 @@ fn run_git(path: &Path, args: &[&str]) -> String {
     String::from_utf8(out.stdout).unwrap()
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test drives a scratch git repository outside the support::Repo helper"
-)]
 fn clone_no_local(src: &Path, dest: &Path) {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test drives a scratch git repository outside the support::Repo helper"
+    )]
     let out = Command::new("git")
         .args(["clone", "--quiet", "--no-local"])
         .arg(src)
@@ -221,11 +221,11 @@ fn clone_no_local(src: &Path, dest: &Path) {
     );
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test probes object reachability in a scratch git repository"
-)]
 fn commit_exists(path: &Path, sha: &str) -> bool {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test probes object reachability in a scratch git repository"
+    )]
     Command::new("git")
         .arg("-C")
         .arg(path)
@@ -235,11 +235,11 @@ fn commit_exists(path: &Path, sha: &str) -> bool {
         .unwrap_or(false)
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test inspects a scratch bare git repository's refs"
-)]
 fn ref_exists(path: &Path, refname: &str) -> bool {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test inspects a scratch bare git repository's refs"
+    )]
     Command::new("git")
         .arg("-C")
         .arg(path)
@@ -778,11 +778,11 @@ fn ls_remote_sha(from: &Path, remote: &Path, refname: &str) -> Option<String> {
     out.split_whitespace().next().map(str::to_owned)
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test re-executes its own test binary with GH_TOKEN set"
-)]
 fn self_exe() -> Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test re-executes its own test binary with GH_TOKEN set"
+    )]
     Command::new(std::env::current_exe().unwrap())
 }
 

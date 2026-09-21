@@ -2,11 +2,11 @@ mod support;
 use std::process::Command;
 use support::Repo;
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test executes the capobara binary"
-)]
 fn capobara() -> Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test executes the capobara binary"
+    )]
     Command::new(env!("CARGO_BIN_EXE_capobara"))
 }
 

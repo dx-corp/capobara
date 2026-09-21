@@ -5,11 +5,11 @@ use crate::{Error, Result};
 
 /// The reviewed process boundary for git: every other module reaches git
 /// only through this function (or the helpers below that call it).
-#[allow(
-    clippy::disallowed_methods,
-    reason = "git is the reviewed process boundary for capobara"
-)]
 fn run(root: &Path, args: &[&str]) -> Result<std::process::Output> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "git is the reviewed process boundary for capobara"
+    )]
     Command::new("git")
         .arg("-C")
         .arg(root)

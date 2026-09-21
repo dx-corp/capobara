@@ -426,11 +426,11 @@ fn deixic_python_definition_loads_against_the_real_sdk_assembly_policy() {
 // in the `sdk-assembly-v1` branch of `build_projection`.
 // ---------------------------------------------------------------------
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test executes the capobara binary"
-)]
 fn capobara() -> Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test executes the capobara binary"
+    )]
     Command::new(env!("CARGO_BIN_EXE_capobara"))
 }
 
