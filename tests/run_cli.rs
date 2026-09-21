@@ -120,19 +120,19 @@ fn write_recording(dir: &Path, calls: Vec<Value>) -> PathBuf {
     path
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test executes the capobara binary"
-)]
 fn capobara() -> Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test executes the capobara binary"
+    )]
     Command::new(env!("CARGO_BIN_EXE_capobara"))
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration tests drive scratch git repositories outside the support::Repo helper"
-)]
 fn run_git(path: &Path, args: &[&str]) -> String {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration tests drive scratch git repositories outside the support::Repo helper"
+    )]
     let out = Command::new("git")
         .arg("-C")
         .arg(path)
@@ -147,11 +147,11 @@ fn run_git(path: &Path, args: &[&str]) -> String {
     String::from_utf8(out.stdout).unwrap()
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test inspects a scratch bare git repository's refs"
-)]
 fn ref_sha(path: &Path, refname: &str) -> Option<String> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test inspects a scratch bare git repository's refs"
+    )]
     Command::new("git")
         .arg("-C")
         .arg(path)

@@ -32,11 +32,11 @@
 //!    CAPOBARA_TREE_ID".
 use std::process::Command;
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "build script queries git for the crate tree id"
-)]
 fn git(dir: &str, args: &[&str]) -> Option<String> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "build script queries git for the crate tree id"
+    )]
     let output = Command::new("git")
         .arg("-C")
         .arg(dir)

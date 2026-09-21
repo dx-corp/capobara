@@ -151,11 +151,11 @@ fn coupled_projections_share_one_source_revision_and_require_every_member_presen
     assert_eq!(err.to_string(), "Missing coupled projection: deixic-node");
 }
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "integration test executes the capobara binary"
-)]
 fn capobara() -> std::process::Command {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "integration test executes the capobara binary"
+    )]
     std::process::Command::new(env!("CARGO_BIN_EXE_capobara"))
 }
 

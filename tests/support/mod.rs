@@ -20,11 +20,11 @@ impl Repo {
     pub fn path(&self) -> &Path {
         self.dir.path()
     }
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "integration tests drive a scratch git repository"
-    )]
     pub fn git(&self, args: &[&str]) -> String {
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "integration tests drive a scratch git repository"
+        )]
         let out = Command::new("git")
             .arg("-C")
             .arg(self.path())
@@ -191,11 +191,11 @@ pub fn is_named_by_include(mapping: &capobara::definition::Mapping, path: &str) 
 }
 
 /// `git ls-files` under `dir`, relative to `dir`.
-#[allow(
-    clippy::disallowed_methods,
-    reason = "test enumerates the crate's own git-tracked files"
-)]
 pub fn git_ls_files(dir: &Path) -> Vec<String> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "test enumerates the crate's own git-tracked files"
+    )]
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)

@@ -89,11 +89,11 @@ pub fn with_snapshot<T>(
 /// closed its stdin, producing a broken pipe on our write). A write error
 /// is remembered rather than propagated immediately, so the child is
 /// always reaped and a broken pipe never shadows `tar`'s real diagnostic.
-#[allow(
-    clippy::disallowed_methods,
-    reason = "tar extraction of a git archive is a reviewed process boundary"
-)]
 fn extract_tar(archive: &[u8], dest: &Path) -> Result<()> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "tar extraction of a git archive is a reviewed process boundary"
+    )]
     let mut tar = Command::new("tar")
         .args(["-xf", "-", "-C"])
         .arg(dest)
