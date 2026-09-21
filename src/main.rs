@@ -7,6 +7,7 @@ use capobara::cli::catalog::CatalogCommand;
 use capobara::cli::project::ProjectCommand;
 use capobara::cli::run::RunArgs;
 use capobara::cli::transport::{PrepareArgs, ReportArgs};
+use capobara::cli::vendor::VendorCliArgs;
 
 #[derive(Parser)]
 #[command(
@@ -40,6 +41,9 @@ enum Command {
     Verify(ProjectCliArgs),
     /// Report drift between source and destination.
     Check(ProjectCliArgs),
+    /// Verify a vendored upstream tree against its pinned commit.
+    #[command(subcommand)]
+    Vendor(VendorCommand),
     /// Clone-side preparation of the destination branch.
     Prepare(PrepareArgs),
     /// Recheck a prepared projection before publication.
@@ -139,5 +143,24 @@ fn main() {
         Command::Preflight(args) => exit_transport(capobara::cli::transport::preflight(args)),
         Command::Publish(args) => exit_transport(capobara::cli::transport::publish(args)),
         Command::Run(args) => exit_transport(capobara::cli::run::run(args)),
+        Command::Vendor(VendorCommand::Check(args)) => {
+            exit_vendor(capobara::cli::vendor::check(args));
+        }
+    }
+}
+
+#[derive(Subcommand)]
+enum VendorCommand {
+    /// Report divergence between a vendored tree and its pinned upstream commit.
+    Check(VendorCliArgs),
+}
+
+fn exit_vendor(result: capobara::Result<capobara::vendor::VendorReport>) {
+    match result {
+        Ok(_) => std::process::exit(0),
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(error.exit_code());
+        }
     }
 }

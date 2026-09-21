@@ -8,6 +8,7 @@ pub mod catalog;
 pub mod project;
 pub mod run;
 pub mod transport;
+pub mod vendor;
 
 use std::path::PathBuf;
 
