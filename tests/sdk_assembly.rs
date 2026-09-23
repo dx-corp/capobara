@@ -15,6 +15,17 @@
 //! the closure's extension swap expects); and the Go closure's `deixic/v1`
 //! root imports every other generated Go package by its full module path.
 
+macro_rules! cargo_bin {
+    ($name:literal) => {{
+        option_env!(concat!("CARGO_BIN_EXE_", $name))
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os(concat!("CARGO_BIN_EXE_", $name)).map(std::path::PathBuf::from)
+            })
+            .expect(concat!("Cargo binary path unavailable: ", $name))
+    }};
+}
+
 mod support;
 
 use std::collections::BTreeSet;
@@ -431,7 +442,7 @@ fn capobara() -> Command {
         clippy::disallowed_methods,
         reason = "integration test executes the capobara binary"
     )]
-    Command::new(env!("CARGO_BIN_EXE_capobara"))
+    Command::new(cargo_bin!("capobara"))
 }
 
 // Debug-only, like `tests/project_cli.rs`: the synthetic source repository's

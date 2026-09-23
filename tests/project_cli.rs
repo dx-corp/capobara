@@ -1,3 +1,14 @@
+macro_rules! cargo_bin {
+    ($name:literal) => {{
+        option_env!(concat!("CARGO_BIN_EXE_", $name))
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os(concat!("CARGO_BIN_EXE_", $name)).map(std::path::PathBuf::from)
+            })
+            .expect(concat!("Cargo binary path unavailable: ", $name))
+    }};
+}
+
 mod support;
 use std::process::Command;
 use support::Repo;
@@ -7,7 +18,7 @@ fn capobara() -> Command {
         clippy::disallowed_methods,
         reason = "integration test executes the capobara binary"
     )]
-    Command::new(env!("CARGO_BIN_EXE_capobara"))
+    Command::new(cargo_bin!("capobara"))
 }
 
 fn definition_json(name: &str) -> String {

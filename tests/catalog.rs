@@ -1,3 +1,14 @@
+macro_rules! cargo_bin {
+    ($name:literal) => {{
+        option_env!(concat!("CARGO_BIN_EXE_", $name))
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os(concat!("CARGO_BIN_EXE_", $name)).map(std::path::PathBuf::from)
+            })
+            .expect(concat!("Cargo binary path unavailable: ", $name))
+    }};
+}
+
 mod support;
 use capobara::catalog::{assert_main_authorized_revision, publication_matrix, read_catalog};
 use support::Repo;
@@ -156,7 +167,7 @@ fn capobara() -> std::process::Command {
         clippy::disallowed_methods,
         reason = "integration test executes the capobara binary"
     )]
-    std::process::Command::new(env!("CARGO_BIN_EXE_capobara"))
+    std::process::Command::new(cargo_bin!("capobara"))
 }
 
 /// `catalog check`/`catalog matrix`'s `--root` resolution. Node's `ROOT`
