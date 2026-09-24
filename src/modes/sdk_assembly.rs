@@ -91,15 +91,11 @@ fn apply_transform(transform: Option<Transform>, content: &[u8]) -> Result<Vec<u
     let text = String::from_utf8_lossy(content).into_owned();
     match transform {
         Transform::PythonPyproject => {
-            static DEPENDENCY: LazyLock<Regex> = LazyLock::new(|| {
-                Regex::new(r#"(?m)^  "evalops-sdk[^"]+",\n"#).expect("static regex is valid")
-            });
             contract(
-                DEPENDENCY.find_iter(&text).count() == 1,
-                "Python generated dependency declaration changed",
+                !text.contains("\"evalops-sdk"),
+                "Python package must not depend on the internal generated SDK",
             )?;
-            let without_dependency = DEPENDENCY.replace(&text, "");
-            Ok(without_dependency
+            Ok(text
                 .replace(
                     "https://github.com/dx-corp/mono",
                     "https://github.com/dx-corp/deixic-python",
@@ -156,49 +152,25 @@ fn validate_closure(policy: &Policy, source_entries: &HashMap<String, Entry>) ->
 }
 
 fn validate_python_closure(source_entries: &HashMap<String, Entry>) -> Result<()> {
+    let protocol = source_text(
+        source_entries,
+        "sdk/deixic/python/src/deixicpublic/v1/sdk_pb2.py",
+    )?;
+    contract(
+        protocol.contains("deixicpublic.v1"),
+        "Python public protocol missing",
+    )?;
     static IMPORT: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?m)^from ([A-Za-z0-9_.]+) import ([A-Za-z0-9_]+_pb2)\b")
+        Regex::new(r"(?m)^from ([A-Za-z_][A-Za-z0-9_.]*) import .*_pb2")
             .expect("static regex is valid")
     });
-    const PREFIX: &str = "gen/python/";
-    let allowed: HashSet<String> = policies::PYTHON_GENERATED_FILES
-        .iter()
-        .map(|path| format!("{PREFIX}{path}"))
-        .collect();
-    let mut visited: HashSet<String> = HashSet::new();
-    let mut queue: Vec<String> = vec![format!("{PREFIX}console/v1/console_pb2.py")];
-    while let Some(path) = queue.pop() {
-        if visited.contains(&path) {
-            continue;
-        }
+    for caps in IMPORT.captures_iter(&protocol) {
         contract(
-            allowed.contains(&path),
-            format!("Python generated import escapes reviewed closure: {path}"),
+            caps[1].starts_with("google.protobuf"),
+            "Python protocol imports an unreviewed generated module",
         )?;
-        visited.insert(path.clone());
-        let text = source_text(source_entries, &path)?;
-        for caps in IMPORT.captures_iter(&text) {
-            let package_name = &caps[1];
-            let module_name = &caps[2];
-            if package_name.starts_with("google.protobuf") {
-                continue;
-            }
-            let imported = format!(
-                "{PREFIX}{}/{module_name}.py",
-                package_name.replace('.', "/")
-            );
-            contract(
-                allowed.contains(&imported),
-                format!("Python generated import escapes reviewed closure: {imported}"),
-            )?;
-            queue.push(imported);
-        }
     }
-    require_same_set(
-        &visited.into_iter().collect::<Vec<_>>(),
-        &allowed.into_iter().collect::<Vec<_>>(),
-        "Python generated dependency closure",
-    )
+    Ok(())
 }
 
 fn validate_typescript_closure(source_entries: &HashMap<String, Entry>) -> Result<()> {
@@ -209,18 +181,11 @@ fn validate_typescript_closure(source_entries: &HashMap<String, Entry>) -> Resul
         "sdk/deixic/typescript/src/index.ts".to_string(),
         "sdk/deixic/typescript/src/tasks.ts".to_string(),
     ];
-    let mut allowed: HashSet<String> = build_roots.iter().cloned().collect();
-    allowed.extend(
-        policies::NODE_SHARED_FILES
-            .iter()
-            .filter(|path| path.ends_with(".ts"))
-            .map(|path| (*path).to_string()),
-    );
-    allowed.extend(
-        policies::TYPESCRIPT_GENERATED_FILES
-            .iter()
-            .map(|path| format!("gen/ts/{path}")),
-    );
+    let allowed: HashSet<String> = policies::NODE_PACKAGE_FILES
+        .iter()
+        .filter(|path| path.starts_with("src/"))
+        .map(|path| format!("sdk/deixic/typescript/{path}"))
+        .collect();
     let mut visited: HashSet<String> = HashSet::new();
     let mut queue: Vec<String> = build_roots.to_vec();
     while let Some(path) = queue.pop() {
@@ -283,8 +248,8 @@ fn validate_go_closure(source_entries: &HashMap<String, Entry>) -> Result<()> {
     let mut visited_files: HashSet<String> = HashSet::new();
     let mut visited_packages: HashSet<String> = HashSet::new();
     let mut queue: Vec<String> = vec![
-        "deixic/v1".to_string(),
-        "deixic/v1/deixicv1connect".to_string(),
+        "deixicpublic/v1".to_string(),
+        "deixicpublic/v1/deixicpublicv1connect".to_string(),
     ];
     while let Some(package_path) = queue.pop() {
         if visited_packages.contains(&package_path) {

@@ -417,6 +417,28 @@ fn validate_definition_value(
         });
     }
 
+    if name == "api" {
+        for (source, expected) in [
+            ("proto", "deixicpublic/v1/sdk.proto"),
+            ("gen/openapi", "deixicpublic/v1/sdk.openapi.yaml"),
+        ] {
+            invalid(
+                mapping_fields
+                    .iter()
+                    .filter(|mapping| mapping.source == source)
+                    .count()
+                    == 1
+                    && mapping_fields.iter().any(|mapping| {
+                        mapping.source == source
+                            && mapping.include.len() == 1
+                            && mapping.include[0] == expected
+                            && mapping.exclude.is_empty()
+                    }),
+                format!("Public API {source} projection must contain only {expected}"),
+            )?;
+        }
+    }
+
     if mode == "sdk-assembly-v1" {
         // Rule 10
         let policy_inputs = sdk_inputs(name);
