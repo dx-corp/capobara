@@ -72,7 +72,12 @@ fn relative_specifier(from_file: &str, to_file: &str) -> String {
     let mut segments: Vec<String> = (0..ups).map(|_| "..".to_string()).collect();
     segments.extend(to_parts[common..].iter().map(|s| s.to_string()));
     segments.push(to_name.to_string());
-    segments.join("/")
+    let result = segments.join("/");
+    if ups == 0 {
+        format!("./{result}")
+    } else {
+        result
+    }
 }
 
 /// Swaps a `.ts` specifier for the `.js` one the real compiled output (and
@@ -84,28 +89,12 @@ fn js_specifier(ts_path: &str) -> String {
     }
 }
 
-fn python_package_and_module(generated_path: &str) -> (String, String) {
-    let without_ext = generated_path.strip_suffix(".py").unwrap();
-    match without_ext.rsplit_once('/') {
-        Some((dir, module)) => (dir.replace('/', "."), module.to_string()),
-        None => (String::new(), without_ext.to_string()),
-    }
-}
-
-fn go_package_of(path: &str) -> String {
-    match path.rfind('/') {
-        Some(idx) => path[..idx].to_string(),
-        None => String::new(),
-    }
-}
-
 const PYPROJECT_TOML: &str = concat!(
     "[project]\n",
     "name = \"deixic\"\n",
     "version = \"0.1.0\"\n",
     "dependencies = [\n",
     "  \"httpx>=0.27\",\n",
-    "  \"evalops-sdk-core==1.2.3\",\n",
     "]\n",
     "\n",
     "[project.urls]\n",
@@ -123,7 +112,7 @@ const PACKAGE_JSON: &str = concat!(
     "}\n",
 );
 
-const GO_MOD: &str = "module github.com/evalops/platform/gen/go\n\ngo 1.21\n";
+const GO_MOD: &str = "module github.com/dx-corp/deixic-go\n\ngo 1.26.0\n";
 
 /// Builds a tempdir snapshot containing every input every policy names,
 /// shaped so all three closures pass. Reused by every test below except the
@@ -147,22 +136,11 @@ fn populate_snapshot(root: &Path) {
             write(root, &full, format!("# {path}\n").as_bytes());
         }
     }
-    for path in policies::PYTHON_GENERATED_FILES {
-        let full = format!("gen/python/{path}");
-        if *path == "console/v1/console_pb2.py" {
-            let mut content = String::from("# generated console module\n");
-            for other in policies::PYTHON_GENERATED_FILES {
-                if *other == *path {
-                    continue;
-                }
-                let (package, module) = python_package_and_module(other);
-                content.push_str(&format!("from {package} import {module}\n"));
-            }
-            write(root, &full, content.as_bytes());
-        } else {
-            write(root, &full, b"# generated\n");
-        }
-    }
+    write(
+        root,
+        "sdk/deixic/python/src/deixicpublic/v1/sdk_pb2.py",
+        b"# deixicpublic.v1\n",
+    );
 
     // ---- Node / TypeScript ----
     let index_path = "sdk/deixic/typescript/src/index.ts";
@@ -180,55 +158,31 @@ fn populate_snapshot(root: &Path) {
         }
     }
     let mut index_content = String::new();
-    for shared in policies::NODE_SHARED_FILES
+    for path in policies::NODE_PACKAGE_FILES
         .iter()
-        .filter(|path| path.ends_with(".ts"))
+        .filter(|path| path.starts_with("src/") && **path != "src/index.ts")
     {
-        let spec = js_specifier(&relative_specifier(index_path, shared));
-        index_content.push_str(&format!("export * from \"{spec}\";\n"));
-    }
-    for generated in policies::TYPESCRIPT_GENERATED_FILES {
-        let full = format!("gen/ts/{generated}");
+        let full = format!("sdk/deixic/typescript/{path}");
         let spec = js_specifier(&relative_specifier(index_path, &full));
         index_content.push_str(&format!("export * from \"{spec}\";\n"));
     }
     write(root, index_path, index_content.as_bytes());
-    for path in policies::NODE_SHARED_FILES {
-        write(root, path, format!("// {path}\n").as_bytes());
-    }
-    for path in policies::TYPESCRIPT_GENERATED_FILES {
-        write(root, &format!("gen/ts/{path}"), b"// generated\n");
-    }
 
     // ---- Go ----
     write(root, "sdk/deixic/go/README.md", b"# deixic-go\n");
     write(
         root,
         "sdk/deixic/go/deixic_connect_test.go.in",
-        b"package deixicv1connect_test\n\nfunc TestProjection(t *testing.T) {}\n",
+        b"package deixicpublicv1connect_test\n\nfunc TestProjection(t *testing.T) {}\n",
     );
     write(root, "gen/go/CHANGELOG.md", b"# changelog\n");
-    write(root, "gen/go/go.mod", GO_MOD.as_bytes());
-    write(root, "gen/go/go.sum", b"\n");
+    write(root, "sdk/deixic/go/go.mod", GO_MOD.as_bytes());
+    write(root, "sdk/deixic/go/go.sum", b"\n");
 
-    let hub_package: &str = "deixic/v1";
-    let mut other_packages: BTreeSet<String> = policies::GO_GENERATED_FILES
-        .iter()
-        .map(|path| go_package_of(path))
-        .collect();
-    other_packages.remove(hub_package);
-    other_packages.remove("deixic/v1/deixicv1connect");
-    let mut import_block = String::new();
-    for package in &other_packages {
-        import_block.push_str(&format!(
-            "\t\"github.com/evalops/platform/gen/go/{package}\"\n"
-        ));
-    }
-    let deixic_pb_go =
-        format!("package deixicv1\n\nimport (\n{import_block})\n\ntype Placeholder struct{{}}\n");
+    let deixic_pb_go = "package deixicpublicv1\n\ntype Placeholder struct{}\n";
     for path in policies::GO_GENERATED_FILES {
         let full = format!("gen/go/{path}");
-        if *path == "deixic/v1/deixic.pb.go" {
+        if *path == "deixicpublic/v1/sdk.pb.go" {
             write(root, &full, deixic_pb_go.as_bytes());
         } else {
             write(root, &full, b"// generated\n");
@@ -340,11 +294,10 @@ fn language_specific_assembly_removes_unpublished_and_mono_only_identities() {
             .into_owned();
     assert!(package_json.contains("github.com/dx-corp/deixic-node"));
     assert!(
-        node.entries
+        !node
+            .entries
             .keys()
-            .filter(|path| path.starts_with("sdk/maestro/"))
-            .all(|path| path.contains("/typescript/src/")
-                || path.ends_with("verify-descriptor-sources.mjs"))
+            .any(|path| path.starts_with("sdk/maestro/"))
     );
     assert!(
         !node
@@ -367,7 +320,7 @@ fn language_specific_assembly_removes_unpublished_and_mono_only_identities() {
     )
     .unwrap();
     assert_eq!(
-        go.entries["deixic/v1/deixicv1connect/projection_test.go"].content,
+        go.entries["deixicpublic/v1/deixicpublicv1connect/projection_test.go"].content,
         go_test_template
     );
     let go_mod = String::from_utf8_lossy(&go.entries["go.mod"].content).into_owned();
@@ -387,7 +340,9 @@ fn language_specific_assembly_removes_unpublished_and_mono_only_identities() {
 #[test]
 fn generated_dependency_closure_fails_closed_when_an_import_escapes() {
     let snapshot = build_snapshot();
-    let console_path = snapshot.path().join("gen/python/console/v1/console_pb2.py");
+    let console_path = snapshot
+        .path()
+        .join("sdk/deixic/python/src/deixicpublic/v1/sdk_pb2.py");
     let mut content = std::fs::read_to_string(&console_path).unwrap();
     content.push_str("from private.v1 import staff_pb2\n");
     std::fs::write(&console_path, content).unwrap();
@@ -395,7 +350,7 @@ fn generated_dependency_closure_fails_closed_when_an_import_escapes() {
     let err = sdk_assembly::assemble(snapshot.path(), "deixic-python").unwrap_err();
     assert_eq!(
         err.to_string(),
-        "Python generated import escapes reviewed closure: gen/python/private/v1/staff_pb2.py"
+        "Python protocol imports an unreviewed generated module"
     );
 }
 

@@ -82,7 +82,6 @@ pub fn populate_python_snapshot(root: &Path) {
         "version = \"0.1.0\"\n",
         "dependencies = [\n",
         "  \"httpx>=0.27\",\n",
-        "  \"evalops-sdk-core==1.2.3\",\n",
         "]\n",
         "\n",
         "[project.urls]\n",
@@ -95,14 +94,6 @@ pub fn populate_python_snapshot(root: &Path) {
         std::fs::write(&full, contents).unwrap();
     }
 
-    fn package_and_module(generated_path: &str) -> (String, String) {
-        let without_ext = generated_path.strip_suffix(".py").unwrap();
-        match without_ext.rsplit_once('/') {
-            Some((dir, module)) => (dir.replace('/', "."), module.to_string()),
-            None => (String::new(), without_ext.to_string()),
-        }
-    }
-
     for path in policies::PYTHON_SDK_FILES {
         let full = format!("sdk/deixic/python/{path}");
         if *path == "pyproject.toml" {
@@ -111,22 +102,11 @@ pub fn populate_python_snapshot(root: &Path) {
             write(root, &full, format!("# {path}\n").as_bytes());
         }
     }
-    for path in policies::PYTHON_GENERATED_FILES {
-        let full = format!("gen/python/{path}");
-        if *path == "console/v1/console_pb2.py" {
-            let mut content = String::from("# generated console module\n");
-            for other in policies::PYTHON_GENERATED_FILES {
-                if *other == *path {
-                    continue;
-                }
-                let (package, module) = package_and_module(other);
-                content.push_str(&format!("from {package} import {module}\n"));
-            }
-            write(root, &full, content.as_bytes());
-        } else {
-            write(root, &full, b"# generated\n");
-        }
-    }
+    write(
+        root,
+        "sdk/deixic/python/src/deixicpublic/v1/sdk_pb2.py",
+        b"# deixicpublic.v1\n",
+    );
 }
 
 // ---------------------------------------------------------------------
