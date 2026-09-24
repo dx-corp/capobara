@@ -308,6 +308,35 @@ fn language_specific_assembly_removes_unpublished_and_mono_only_identities() {
 
     let go = sdk_assembly::assemble(snapshot.path(), "deixic-go").unwrap();
     let policy = sdk_assembly::policy("deixic-go").unwrap();
+    for legacy in [
+        "agentruntime",
+        "agents",
+        "codex",
+        "common",
+        "connectors",
+        "console",
+        "deixic",
+        "memory",
+        "meter",
+        "objectives",
+        "orbcontrol",
+        "platform",
+        "remoterunner",
+        "toolexecution",
+        "traces",
+        "vfs",
+    ] {
+        assert!(
+            policy.output_managed.contains(&format!("{legacy}/**")),
+            "Capobara must delete legacy {legacy} bindings from the public Go SDK"
+        );
+        assert!(
+            !go.entries
+                .keys()
+                .any(|path| path.starts_with(&format!("{legacy}/"))),
+            "{legacy} must not be copied back into the Go SDK"
+        );
+    }
     assert!(
         policy
             .input_roots
