@@ -17,6 +17,7 @@ pub const PYTHON_SDK_FILES: &[&str] = &[
     "src/deixic/auth.py",
     "src/deixic/client.py",
     "src/deixic/errors.py",
+    "src/deixic/federation.py",
     "src/deixic/examples/__init__.py",
     "src/deixic/examples/account_brief.py",
     "src/deixic/examples/account_brief_result.py",
@@ -37,6 +38,7 @@ pub const PYTHON_SDK_FILES: &[&str] = &[
     "tests/test_recovery.py",
     "tests/test_tasks.py",
     "tests/test_test_journey.py",
+    "tests/test_workload_federation.py",
 ];
 
 // Generated protobuf/gRPC Python modules under `gen/python/`, copied into

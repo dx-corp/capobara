@@ -530,8 +530,13 @@ fn apply_assembles_a_real_sdk_assembly_projection_through_the_reviewed_policy() 
     // identity transform has run on `pyproject.toml`, and the
     // destination-owned file is untouched.
     assert_eq!(
-        std::fs::read(target.path().join("src/meter/v1/meter_pb2.py")).unwrap(),
-        std::fs::read(source.path().join("gen/python/meter/v1/meter_pb2.py")).unwrap(),
+        std::fs::read(target.path().join("src/deixicpublic/v1/sdk_pb2.py")).unwrap(),
+        std::fs::read(
+            source
+                .path()
+                .join("sdk/deixic/python/src/deixicpublic/v1/sdk_pb2.py")
+        )
+        .unwrap(),
     );
     let pyproject = std::fs::read_to_string(target.path().join("pyproject.toml")).unwrap();
     assert!(!pyproject.contains("dx-corp/mono"), "{pyproject}");
