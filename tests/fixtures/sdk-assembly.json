@@ -15,6 +15,7 @@
       "src/deixic/examples/account_brief_result.py",
       "src/deixic/examples/task_result.py",
       "src/deixic/examples/verify_test_journey.py",
+      "src/deixic/federation.py",
       "src/deixic/protocol.py",
       "src/deixic/py.typed",
       "src/deixic/tasks.py",
@@ -29,7 +30,8 @@
       "tests/test_real_journey.py",
       "tests/test_recovery.py",
       "tests/test_tasks.py",
-      "tests/test_test_journey.py"
+      "tests/test_test_journey.py",
+      "tests/test_workload_federation.py"
     ],
     "deixic-node": [
       "sdk/deixic/typescript/CHANGELOG.md",

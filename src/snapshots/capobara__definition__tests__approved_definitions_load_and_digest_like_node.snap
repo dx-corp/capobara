@@ -1,6 +1,5 @@
 ---
 source: tools/capobara/src/definition.rs
-assertion_line: 463
-expression: definition_digest(&api.raw)
+expression: definition_digest(&api.text).unwrap()
 ---
-1b99f898b612f6adeb8261ebea5314f7e78f0d41d4667ce98cb9bb94155369f4
+4c1601bee99ccc8305013324608e9c146999b21427179d25fd342f69aebd37bd
