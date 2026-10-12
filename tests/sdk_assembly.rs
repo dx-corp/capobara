@@ -26,7 +26,7 @@ macro_rules! cargo_bin {
     }};
 }
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 use std::os::unix::fs::PermissionsExt;

@@ -1,4 +1,4 @@
-mod support;
+use crate::support;
 use capobara::snapshot::with_snapshot;
 use support::Repo;
 

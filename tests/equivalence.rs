@@ -8,7 +8,7 @@
 //! ```sh
 //! CAPOBARA_EQUIVALENCE_SOURCE_SHAS="<sha-a> <sha-b>" \
 //!   cargo test --manifest-path rust/Cargo.toml --locked -p capobara \
-//!   --test equivalence -- --ignored --nocapture
+//!   --test suite equivalence:: -- --ignored --nocapture
 //! ```
 //!
 //! **This writes to the Mono checkout it is run from**: the script registers

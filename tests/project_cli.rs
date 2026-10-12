@@ -9,7 +9,7 @@ macro_rules! cargo_bin {
     }};
 }
 
-mod support;
+use crate::support;
 use std::process::Command;
 use support::Repo;
 

@@ -9,7 +9,7 @@ macro_rules! cargo_bin {
     }};
 }
 
-mod support;
+use crate::support;
 use capobara::catalog::{assert_main_authorized_revision, publication_matrix, read_catalog};
 use support::Repo;
 

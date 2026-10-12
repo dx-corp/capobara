@@ -1,4 +1,3 @@
-mod support;
 use std::fs;
 use std::path::Path;
 
