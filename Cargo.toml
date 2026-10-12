@@ -60,45 +60,9 @@ undocumented_unsafe_blocks = "deny"
 verbose_file_reads = "deny"
 
 [[test]]
-name = "build"
-path = "tests/build.rs"
-
-[[test]]
-name = "catalog"
-path = "tests/catalog.rs"
-
-[[test]]
-name = "cli"
-path = "tests/cli.rs"
-
-[[test]]
-name = "equivalence"
-path = "tests/equivalence.rs"
-
-[[test]]
-name = "definition_coverage"
-path = "tests/definition_coverage.rs"
-
-[[test]]
-name = "project_cli"
-path = "tests/project_cli.rs"
-
-[[test]]
-name = "snapshot"
-path = "tests/snapshot.rs"
-
-[[test]]
-name = "sdk_assembly"
-path = "tests/sdk_assembly.rs"
-
-[[test]]
 name = "transport_git"
 path = "tests/transport_git.rs"
 required-features = ["recorded-api"]
-
-[[test]]
-name = "standalone_build"
-path = "tests/standalone_build.rs"
 
 [[test]]
 name = "transport_github"
@@ -109,3 +73,7 @@ required-features = ["recorded-api"]
 name = "run_cli"
 path = "tests/run_cli.rs"
 required-features = ["recorded-api"]
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"

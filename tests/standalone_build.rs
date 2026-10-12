@@ -22,7 +22,7 @@
 // time), but forcing it to run anyway will panic in `load_definition`
 // rather than doing anything useful.
 
-mod support;
+use crate::support;
 
 use std::process::Command;
 

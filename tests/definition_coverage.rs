@@ -6,7 +6,7 @@
 //! Gated on `mono-fixtures` because they read files that only exist inside
 //! `dx-corp/mono` (the crate's own git history, `config/projections/`).
 
-mod support;
+use crate::support;
 
 /// Paths under `rust/tools/capobara/` that are git-tracked but deliberately
 /// NOT part of the public self-projection, with the reason each is
