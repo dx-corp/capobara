@@ -48,4 +48,4 @@ repository will be overwritten by the next projection.
 
 ## License
 
-Business Source License 1.1 (BUSL-1.1). See [LICENSE](LICENSE).
+Business Source License 1.1 (BUSL-1.1). See [LICENSE](../../../LICENSE).
