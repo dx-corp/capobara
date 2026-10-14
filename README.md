@@ -7,7 +7,7 @@ a Mono tree.
 
 `dx-corp/mono` is the source of truth. This repository is a projection of
 `rust/tools/capobara`, published here by Capobara itself through the same
-transport it implements — the same transport that will publish the rest
+transport it implements. That transport will publish the rest
 of Mono's projection catalog after cutover. The definition is registered
 in Mono's projection catalog (`config/projections/capobara.json`); wiring
 it into the automated publish matrix lands in a follow-up change.
