@@ -158,3 +158,65 @@ fn production_cli_verifies_committed_definition_reports_drift_and_rejects_malfor
         String::from_utf8_lossy(&check.stderr).contains("Definition differs from source revision")
     );
 }
+
+#[test]
+fn publication_rejects_an_older_or_divergent_source_without_changing_destination() {
+    let source = Repo::init("https://github.com/dx-corp/mono.git");
+    source.write(
+        "config/projections/sample.json",
+        definition_json("sample").as_bytes(),
+    );
+    source.write("pkg/src/a.rs", b"old");
+    source.write("rust/tools/capobara/src/lib.rs", b"// fixture tool");
+    let older = source.commit("older source");
+    let tree_id = source.git(&["rev-parse", "HEAD:rust/tools/capobara"]);
+    source.write("pkg/src/computer.rs", b"new source that must survive");
+    let newer = source.commit("newer source");
+    let target = Repo::init("https://github.com/dx-corp/sample.git");
+    target.write("SECURITY.md", b"destination owned");
+    target.set_remote_main(&target.commit("destination"));
+    let definition = source.path().join("config/projections/sample.json");
+    let apply = |sha: &str| {
+        source.git(&["checkout", "--detach", sha]);
+        capobara()
+            .env("CAPOBARA_TREE_ID_OVERRIDE", tree_id.trim())
+            .args(["apply", "--definition"])
+            .arg(&definition)
+            .arg("--source")
+            .arg(source.path())
+            .args(["--source-sha", sha, "--target"])
+            .arg(target.path())
+            .output()
+            .unwrap()
+    };
+    for sha in [&older, &newer, &newer] {
+        let output = apply(sha);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        target.set_remote_main(&target.commit("projected source"));
+    }
+    let receipt = std::fs::read(target.path().join(".repository-projection.json")).unwrap();
+    source.git(&["checkout", "--detach", &older]);
+    source.write("pkg/src/a.rs", b"divergent");
+    let divergent = source.commit("divergent source");
+    for sha in [&older, &divergent] {
+        let output = apply(sha);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("Source revision would rewind or diverge")
+        );
+        assert_eq!(
+            std::fs::read(target.path().join("src/computer.rs")).unwrap(),
+            b"new source that must survive"
+        );
+        assert_eq!(
+            std::fs::read(target.path().join(".repository-projection.json")).unwrap(),
+            receipt
+        );
+        assert!(target.git(&["status", "--porcelain"]).trim().is_empty());
+    }
+}
