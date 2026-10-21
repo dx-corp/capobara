@@ -295,6 +295,12 @@ pub fn run(args: ProjectArgs) -> Result<i32> {
     // Step 8: validate any stored receipt at the destination.
     let receipt_path = target.join(&definition.provenance);
     let stored = load_stored_receipt(&receipt_path, definition, args.draft)?;
+    if let Some(previous) = &stored {
+        invalid(
+            args.draft || is_ancestor(&source, &previous.source_sha, source_sha),
+            "Source revision would rewind or diverge from stored projection",
+        )?;
+    }
 
     // Step 9: decide whether the stored receipt (if any) is for the exact
     // projection revision being run now, or belongs to a prior one.
