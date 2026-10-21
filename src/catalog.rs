@@ -150,7 +150,7 @@ fn load_catalog_entry(
     let identity_ok = d.name == name
         && d.source_repository == SOURCE_REPOSITORY
         && d.destination.repository == format!("dx-corp/{name}")
-        && d.visibility == "public"
+        && matches!(d.visibility.as_str(), "public" | "private")
         && d.destination.branch == "main"
         && d.destination.sync_branch == "sync/mono-projection";
     invalid(identity_ok, format!("Catalog identity mismatch: {name}"))?;

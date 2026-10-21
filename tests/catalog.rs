@@ -30,6 +30,36 @@ fn definition(name: &str) -> Vec<u8> {
 }
 
 #[test]
+fn catalog_accepts_private_destinations_but_not_customer_visibility() {
+    let repo = Repo::init("https://github.com/dx-corp/mono.git");
+    repo.write(
+        "config/projections/repositories.json",
+        br#"{"schemaVersion":1,"sourceRepository":"dx-corp/mono","projections":["nimbus"]}"#,
+    );
+    let mut private: serde_json::Value = serde_json::from_slice(&definition("nimbus")).unwrap();
+    private["visibility"] = serde_json::json!("private");
+    repo.write(
+        "config/projections/nimbus.json",
+        &serde_json::to_vec(&private).unwrap(),
+    );
+    assert_eq!(
+        read_catalog(repo.path(), &no_sdk).unwrap()[0]
+            .definition
+            .visibility,
+        "private"
+    );
+    private["visibility"] = serde_json::json!("customer");
+    repo.write(
+        "config/projections/nimbus.json",
+        &serde_json::to_vec(&private).unwrap(),
+    );
+    assert_eq!(
+        read_catalog(repo.path(), &no_sdk).unwrap_err().to_string(),
+        "Catalog identity mismatch: nimbus"
+    );
+}
+
+#[test]
 fn publication_matrix_selects_latest_relevant_revision_and_rejects_unauthorized_heads() {
     let repo = Repo::init("https://github.com/dx-corp/mono.git");
     repo.write(
