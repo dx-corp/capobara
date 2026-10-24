@@ -178,3 +178,29 @@ fn standalone_lock_script_copies_exactly_the_projected_source_set() {
          config/projections/capobara.json's exclude list"
     );
 }
+
+#[test]
+#[cfg_attr(not(feature = "mono-fixtures"), ignore)]
+fn committed_code_definition_loads_with_complete_snapshot_inputs() {
+    use capobara::definition::{
+        Mode, load_definition, projection_input_roots, validate_definition,
+    };
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../config/projections/deixic-code.json");
+    let loaded = load_definition(&path, &|_| None).unwrap();
+    assert_eq!(loaded.definition.mode, Mode::MaestroPublicTreeV1);
+    assert_eq!(loaded.definition.destination.repository, "dx-corp/code");
+    validate_definition(&loaded.definition, &|_| None).unwrap();
+    assert_eq!(
+        projection_input_roots(&loaded.definition, &|_| None),
+        [
+            "products/maestro",
+            ".github/actions/setup-sccache",
+            "scripts/ci/aws-lc-system-env.sh",
+            "rust/Cargo.toml",
+            "rust/crates/dex/loop",
+            "rust/crates/managed-inference-contract",
+        ]
+    );
+}

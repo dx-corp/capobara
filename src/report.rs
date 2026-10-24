@@ -14,6 +14,8 @@ pub struct Report {
     pub provenance: Provenance,
     pub source_file_count: usize,
     pub result: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_package_name: Option<String>,
 }
 
 impl From<&Built> for Report {
@@ -26,6 +28,7 @@ impl From<&Built> for Report {
             copied_count,
             deleted_count,
             provenance: built.provenance.clone(),
+            public_package_name: built.public_package_name.clone(),
             // Node: `entries.size - 1` (the receipt entry is not a source file).
             source_file_count: built.plan.entries.len().saturating_sub(1),
             result: if copied_count + deleted_count > 0 {

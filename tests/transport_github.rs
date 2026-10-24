@@ -195,6 +195,7 @@ fn pr_body_carries_complete_provenance_and_bounded_changed_deleted_paths() {
         deleted_count: 25,
         provenance,
         source_file_count: 0,
+        public_package_name: None,
         result: "drift_detected".into(),
     };
 
