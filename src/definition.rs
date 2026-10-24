@@ -20,9 +20,8 @@
 //! top-level field) could report the wrong rule's message depending on which
 //! key came first in the file. See "fix round 1" in the Task 5 report.
 //!
-//! `maestro-public-tree-v1` (a third mode Node supports) is out of scope for
-//! this crate: any unrecognized `mode` string, including that one, is
-//! rejected by rule 3 as an unsupported class/mode pair.
+//! `maestro-public-tree-v1` retains Node's restricted Code mirror identity,
+//! mappings, destination ownership, and snapshot input closure.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -50,6 +49,8 @@ pub enum Mode {
     CopyV1,
     #[serde(rename = "sdk-assembly-v1")]
     SdkAssemblyV1,
+    #[serde(rename = "maestro-public-tree-v1")]
+    MaestroPublicTreeV1,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -86,8 +87,8 @@ pub struct Definition {
     pub provenance: String,
     pub validation: String,
     /// Required for `copy-v1`, forbidden otherwise (rule 1). `#[serde(default)]`
-    /// so a missing key deserializes to `None` for both modes, and
-    /// `skip_serializing_if` so re-serializing a `sdk-assembly-v1` definition
+    /// so a missing key deserializes to `None` for all modes, and
+    /// `skip_serializing_if` so re-serializing a non-copy definition
     /// (e.g. from `validate_definition`, which round-trips through `Value`)
     /// omits the key rather than writing `"outputManaged": null` -- which
     /// would otherwise make `validate_definition_value`'s field-set check see
@@ -291,7 +292,7 @@ fn validate_definition_value(
 
     // Rule 3
     invalid(
-        (class == "source-tree" && mode == "copy-v1")
+        (class == "source-tree" && matches!(mode, "copy-v1" | "maestro-public-tree-v1"))
             || (class == "generated-sdk" && mode == "sdk-assembly-v1"),
         "Unsupported projection class/mode",
     )?;
@@ -439,7 +440,47 @@ fn validate_definition_value(
         }
     }
 
-    if mode == "sdk-assembly-v1" {
+    if mode == "maestro-public-tree-v1" {
+        invalid(
+            name == "deixic-code"
+                && source_repository == "dx-corp/mono"
+                && destination_repository == "dx-corp/code"
+                && branch == "main"
+                && sync_branch == "sync/public-release-mirror"
+                && visibility == "public"
+                && mapping_fields.len() == 3
+                && mapping_fields[0].source == "products/maestro"
+                && mapping_fields[0].destination == "."
+                && mapping_fields[0].exclude.is_empty()
+                && mapping_fields[1].source == ".github/actions/setup-sccache"
+                && mapping_fields[1].destination == ".github/actions/setup-sccache"
+                && mapping_fields[1].include == ["action.yml", "configure.sh"]
+                && mapping_fields[1].exclude.is_empty()
+                && mapping_fields[2].source == "scripts/ci"
+                && mapping_fields[2].destination == "scripts/ci"
+                && mapping_fields[2].include == ["aws-lc-system-env.sh"]
+                && mapping_fields[2].exclude.is_empty()
+                && deletion == "mirror-boundary"
+                && validation == "maestro-prepared-tree-v1",
+            "Code adapter is restricted to the existing mirror",
+        )?;
+        invalid(
+            [
+                ".github/workflows/**",
+                ".github/actionlint.yaml",
+                ".github/public-release-mirror.exclude",
+                "scripts/validate-public-package-deps.js",
+                "test/scripts/validate-public-package-deps.test.ts",
+            ]
+            .iter()
+            .all(|required| {
+                destination_owned
+                    .iter()
+                    .any(|owned| owned.as_str() == *required)
+            }),
+            "Cannot remove Code destination ownership",
+        )?;
+    } else if mode == "sdk-assembly-v1" {
         // Rule 10
         let policy_inputs = sdk_inputs(name);
         invalid(
@@ -470,7 +511,7 @@ fn validate_definition_value(
             "SDK input allowlist differs from registered policy",
         )?;
     } else {
-        // Rule 11 (mode == "copy-v1"; rule 3 admits no other value here)
+        // Rule 11 (mode == "copy-v1")
         invalid(
             deletion == "owned-paths" && validation == "tree-v1",
             "Unsupported copy policy",
@@ -515,7 +556,7 @@ fn validate_definition_value(
 /// duplicating the rule bodies, so the two entry points can never disagree
 /// on a message: this is the smaller diff, at the cost of one JSON
 /// round-trip per call. `output_managed`'s `skip_serializing_if` keeps that
-/// round-trip faithful to the original shape for both modes (see the field's
+/// round-trip faithful to the original shape for all modes (see the field's
 /// doc comment).
 pub fn validate_definition(
     definition: &Definition,
@@ -534,14 +575,36 @@ pub fn definition_digest(text: &str) -> Result<String> {
     Ok(sha256_hex(canonical_compact_json(text)?.as_bytes()))
 }
 
-/// Ports `projectionInputRoots` from project.mjs (the `sdk-assembly-v1` and
-/// `copy-v1` branches only; `maestro-public-tree-v1` is out of scope).
+/// Ports `projectionInputRoots` from project.mjs, including the shared Rust
+/// workspace inputs consumed by the Code mirror preparation.
 pub fn projection_input_roots(
     definition: &Definition,
     sdk_inputs: &dyn Fn(&str) -> Option<Vec<String>>,
 ) -> Vec<String> {
     match definition.mode {
         Mode::SdkAssemblyV1 => sdk_inputs(&definition.name).unwrap_or_default(),
+        Mode::MaestroPublicTreeV1 => {
+            let mut roots: Vec<String> = definition
+                .mappings
+                .iter()
+                .take(2)
+                .map(|mapping| mapping.source.clone())
+                .collect();
+            if let Some(mapping) = definition.mappings.get(2) {
+                roots.extend(
+                    mapping
+                        .include
+                        .iter()
+                        .map(|path| format!("{}/{path}", mapping.source)),
+                );
+            }
+            roots.extend([
+                "rust/Cargo.toml".to_string(),
+                "rust/crates/dex/loop".to_string(),
+                "rust/crates/managed-inference-contract".to_string(),
+            ]);
+            roots
+        }
         Mode::CopyV1 => {
             let mut seen = HashSet::new();
             let mut out = Vec::new();
@@ -579,6 +642,222 @@ pub fn projection_input_roots(
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    fn code_definition_value() -> Value {
+        serde_json::json!({
+            "schemaVersion": 1,
+            "name": "deixic-code",
+            "class": "source-tree",
+            "mode": "maestro-public-tree-v1",
+            "sourceRepository": "dx-corp/mono",
+            "visibility": "public",
+            "mappings": [
+                { "source": "products/maestro", "destination": ".",
+                  "include": ["README.md"], "exclude": [] },
+                { "source": ".github/actions/setup-sccache",
+                  "destination": ".github/actions/setup-sccache",
+                  "include": ["action.yml", "configure.sh"], "exclude": [] },
+                { "source": "scripts/ci", "destination": "scripts/ci",
+                  "include": ["aws-lc-system-env.sh"], "exclude": [] }
+            ],
+            "destination": {
+                "repository": "dx-corp/code", "branch": "main",
+                "syncBranch": "sync/public-release-mirror", "holdLabel": "sync-hold"
+            },
+            "destinationOwned": [
+                ".github/workflows/**", ".github/actionlint.yaml",
+                ".github/public-release-mirror.exclude",
+                "scripts/validate-public-package-deps.js",
+                "test/scripts/validate-public-package-deps.test.ts"
+            ],
+            "deletion": "mirror-boundary",
+            "provenance": ".repository-projection.json",
+            "validation": "maestro-prepared-tree-v1"
+        })
+    }
+
+    #[test]
+    fn code_mirror_accepts_reviewed_shape_and_preserves_typed_validation() {
+        let loaded = definition_from_value(code_definition_value(), &|_| None).unwrap();
+        assert_eq!(loaded.definition.mode, Mode::MaestroPublicTreeV1);
+        assert!(loaded.definition.output_managed.is_none());
+        validate_definition(&loaded.definition, &|_| None).unwrap();
+
+        // Node permits the Maestro allowlist to evolve and additional owned paths.
+        let mut raw = code_definition_value();
+        raw["mappings"][0]["include"] = serde_json::json!(["README.md", "packages/**"]);
+        raw["destinationOwned"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("custom/**"));
+        definition_from_value(raw, &|_| None).unwrap();
+    }
+
+    #[test]
+    fn code_mirror_identity_and_mapping_restrictions_fail_closed() {
+        let mutations = [
+            ("/name", serde_json::json!("other-code")),
+            ("/sourceRepository", serde_json::json!("other/mono")),
+            (
+                "/destination/repository",
+                serde_json::json!("dx-corp/other"),
+            ),
+            ("/destination/branch", serde_json::json!("release")),
+            ("/destination/syncBranch", serde_json::json!("sync/other")),
+            ("/visibility", serde_json::json!("private")),
+            ("/deletion", serde_json::json!("owned-paths")),
+            ("/validation", serde_json::json!("tree-v1")),
+            ("/mappings/0/source", serde_json::json!("products/other")),
+            ("/mappings/0/destination", serde_json::json!("maestro")),
+            ("/mappings/0/exclude", serde_json::json!(["README.md"])),
+            (
+                "/mappings/1/source",
+                serde_json::json!(".github/actions/other"),
+            ),
+            (
+                "/mappings/1/destination",
+                serde_json::json!(".github/actions/other"),
+            ),
+            ("/mappings/1/include", serde_json::json!(["action.yml"])),
+            (
+                "/mappings/1/include",
+                serde_json::json!(["configure.sh", "action.yml"]),
+            ),
+            ("/mappings/1/exclude", serde_json::json!(["configure.sh"])),
+            ("/mappings/2/source", serde_json::json!("scripts/other")),
+            (
+                "/mappings/2/destination",
+                serde_json::json!("scripts/other"),
+            ),
+            ("/mappings/2/include", serde_json::json!(["other.sh"])),
+            (
+                "/mappings/2/include",
+                serde_json::json!(["aws-lc-system-env.sh", "other.sh"]),
+            ),
+            (
+                "/mappings/2/exclude",
+                serde_json::json!(["aws-lc-system-env.sh"]),
+            ),
+        ];
+        for (pointer, value) in mutations {
+            let mut raw = code_definition_value();
+            *raw.pointer_mut(pointer).unwrap() = value;
+            assert_eq!(
+                definition_from_value(raw, &|_| None)
+                    .unwrap_err()
+                    .to_string(),
+                "Code adapter is restricted to the existing mirror",
+                "mutation at {pointer}"
+            );
+        }
+        for extra_mapping in [false, true] {
+            let mut raw = code_definition_value();
+            let mappings = raw["mappings"].as_array_mut().unwrap();
+            if extra_mapping {
+                mappings.push(mappings[0].clone());
+            } else {
+                mappings.pop();
+            }
+            assert_eq!(
+                definition_from_value(raw, &|_| None)
+                    .unwrap_err()
+                    .to_string(),
+                "Code adapter is restricted to the existing mirror"
+            );
+        }
+        let mut raw = code_definition_value();
+        raw["mappings"].as_array_mut().unwrap().swap(1, 2);
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Code adapter is restricted to the existing mirror"
+        );
+    }
+
+    #[test]
+    fn code_mirror_requires_each_destination_ownership_pattern() {
+        for index in 0..5 {
+            let mut raw = code_definition_value();
+            raw["destinationOwned"]
+                .as_array_mut()
+                .unwrap()
+                .remove(index);
+            assert_eq!(
+                definition_from_value(raw, &|_| None)
+                    .unwrap_err()
+                    .to_string(),
+                "Cannot remove Code destination ownership"
+            );
+        }
+        // A broader glob cannot stand in for a required literal pattern.
+        let mut raw = code_definition_value();
+        raw["destinationOwned"][0] = serde_json::json!(".github/**");
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Cannot remove Code destination ownership"
+        );
+    }
+
+    #[test]
+    fn code_mirror_validation_retains_node_error_order() {
+        let mut raw = code_definition_value();
+        raw["outputManaged"] = serde_json::json!(["README.md"]);
+        raw["name"] = serde_json::json!("other-code");
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Unknown or missing projection fields"
+        );
+
+        let mut raw = code_definition_value();
+        raw["class"] = serde_json::json!("generated-sdk");
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Unsupported projection class/mode"
+        );
+
+        let mut raw = code_definition_value();
+        raw["name"] = serde_json::json!("other-code");
+        raw["mappings"][0]["include"] = serde_json::json!(["**"]);
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Allowlist must name explicit files or subtrees"
+        );
+
+        let mut raw = code_definition_value();
+        raw["name"] = serde_json::json!("other-code");
+        raw["destinationOwned"] = serde_json::json!([]);
+        assert_eq!(
+            definition_from_value(raw, &|_| None)
+                .unwrap_err()
+                .to_string(),
+            "Code adapter is restricted to the existing mirror"
+        );
+    }
+
+    #[test]
+    fn code_mirror_snapshot_roots_include_preparation_dependencies() {
+        let loaded = definition_from_value(code_definition_value(), &|_| None).unwrap();
+        assert_eq!(
+            projection_input_roots(&loaded.definition, &|_| None),
+            [
+                "products/maestro",
+                ".github/actions/setup-sccache",
+                "scripts/ci/aws-lc-system-env.sh",
+                "rust/Cargo.toml",
+                "rust/crates/dex/loop",
+                "rust/crates/managed-inference-contract"
+            ]
+        );
+    }
 
     fn fixture(name: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -633,8 +912,14 @@ mod tests {
         raw["mappings"][0]["include"] = serde_json::json!(["**"]);
         assert!(definition_from_value(raw, &sdk_inputs).is_err());
         let mut raw: serde_json::Value = serde_json::from_str(&text).unwrap();
-        raw["mode"] = serde_json::json!("maestro-public-tree-v1");
-        assert!(definition_from_value(raw, &sdk_inputs).is_err());
+        raw["mode"] = serde_json::json!("unsupported-v1");
+        raw.as_object_mut().unwrap().remove("outputManaged");
+        assert_eq!(
+            definition_from_value(raw, &sdk_inputs)
+                .unwrap_err()
+                .to_string(),
+            "Unsupported projection class/mode"
+        );
     }
 
     #[test]
@@ -680,7 +965,8 @@ mod tests {
         // where in the JSON the offending keys sit.
         let text = std::fs::read_to_string(fixture("api")).unwrap();
         let mut raw: serde_json::Value = serde_json::from_str(&text).unwrap();
-        raw["mode"] = serde_json::json!("maestro-public-tree-v1");
+        raw["mode"] = serde_json::json!("unsupported-v1");
+        raw.as_object_mut().unwrap().remove("outputManaged");
         raw["zzz_extra"] = serde_json::json!(true);
         let err = definition_from_value(raw, &sdk_inputs)
             .unwrap_err()

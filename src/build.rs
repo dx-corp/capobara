@@ -1,14 +1,12 @@
 //! Assembles a projection's entries and deletions into a planned `Plan` plus
 //! its `Provenance` receipt. Ports the shared tail of `buildProjection` and
-//! `checkPublicEntry` from `scripts/projections/project.mjs`; the
-//! `maestro-public-tree-v1` branch of `buildProjection` is out of scope for
-//! this crate (see `definition`'s module doc comment).
+//! `checkPublicEntry` from `scripts/projections/project.mjs`.
 
 use std::path::Path;
 
 use crate::definition::{Definition, Mode, definition_digest};
 use crate::git::{is_sha, is_tree_id_or_digest};
-use crate::modes::{Assembled, copy_v1};
+use crate::modes::{Assembled, copy_v1, maestro_public_tree};
 use crate::receipt::Provenance;
 use crate::tree::{Entry, Matcher, Plan, files_under, plan_tree, tree_digest};
 use crate::{Result, contract};
@@ -28,6 +26,7 @@ pub struct BuildInput<'a> {
 pub struct Built {
     pub plan: Plan,
     pub provenance: Provenance,
+    pub public_package_name: Option<String>,
 }
 
 /// Ports `checkPublicEntry`. `regex` has no lookahead, so the private-path
@@ -136,6 +135,9 @@ pub fn build_projection(
 
     let (mut entries, mut deletions) = match definition.mode {
         Mode::CopyV1 => copy_v1::collect(definition, source_root, target_root, &owned)?,
+        Mode::MaestroPublicTreeV1 => {
+            maestro_public_tree::collect(definition, source_root, target_root, &owned)?
+        }
         Mode::SdkAssemblyV1 => {
             let assembled = assemble(source_root, &definition.name)?;
             let allowed = Matcher::new(&assembled.output_include)?;
@@ -202,5 +204,16 @@ pub fn build_projection(
     }
 
     let plan = plan_tree(target_root, entries, deletions)?;
-    Ok(Built { plan, provenance })
+    let public_package_name = if definition.mode == Mode::MaestroPublicTreeV1 {
+        Some(maestro_public_tree::public_package_name(
+            &source_root.join("products/maestro"),
+        )?)
+    } else {
+        None
+    };
+    Ok(Built {
+        plan,
+        provenance,
+        public_package_name,
+    })
 }

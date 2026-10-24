@@ -7,10 +7,12 @@ a Mono tree.
 
 `dx-corp/mono` is the source of truth. This repository is a projection of
 `rust/tools/capobara`, published here by Capobara itself through the same
-transport it implements. That transport will publish the rest
-of Mono's projection catalog after cutover. The definition is registered
-in Mono's projection catalog (`config/projections/capobara.json`); wiring
-it into the automated publish matrix lands in a follow-up change.
+transport it implements. Mono's projection catalog registers the definition
+at `config/projections/capobara.json`. The dedicated Code mirror also uses
+Capobara for its `maestro-public-tree-v1` projection: package sanitization,
+public documentation boundaries, vendored Rust dependencies, and stale-file
+deletion run inside the binary. The Code workflow retains its release checks
+and destination pull-request publication.
 
 ## Build
 
@@ -37,8 +39,10 @@ directly rather than inheriting them, and this repository carries a
 | `capobara publish` | Commit, push, and open or update the pull request. |
 | `capobara run` | Prepare, apply, verify, preflight, publish, and prove in one process. |
 
-`catalog`, `prepare`, `preflight`, `publish`, and `run` are landing
-incrementally; track progress in `dx-corp/mono`.
+`plan`, `apply`, `verify`, and `check` support `copy-v1`,
+`sdk-assembly-v1`, and the restricted `maestro-public-tree-v1` Code definition.
+The Code definition stays outside the general catalog fanout; its dedicated
+workflow owns version checks, prepared-tree guardrails, and auto-merge.
 
 ## Contributing
 

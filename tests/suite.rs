@@ -27,6 +27,9 @@ mod equivalence;
 #[path = "definition_coverage.rs"]
 mod definition_coverage;
 
+#[path = "maestro_public_tree.rs"]
+mod maestro_public_tree;
+
 #[path = "project_cli.rs"]
 mod project_cli;
 
