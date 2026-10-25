@@ -128,7 +128,7 @@ fn resolve_package(source: &Path) -> Result<(Vec<u8>, String)> {
 }
 
 /// Resolves the receipt's package coordinate from the product source root.
-pub fn public_package_name(source: &Path) -> Result<String> {
+pub(crate) fn public_package_name(source: &Path) -> Result<String> {
     resolve_package(source).map(|(_, name)| name)
 }
 
@@ -500,7 +500,7 @@ fn assert_cerebro_boundary(entries: &Entries) -> Result<()> {
 
 /// Collect the sanitized product tree and destination deletion candidates.
 /// Shared build validation performs the final destination-ownership check.
-pub fn collect(
+pub(crate) fn collect(
     definition: &Definition,
     source_root: &Path,
     target_root: &Path,
