@@ -2,7 +2,7 @@
 //! `build::build_projection` folds into a receipt and a `Plan`.
 
 pub mod copy_v1;
-pub mod maestro_public_tree;
+pub(crate) mod maestro_public_tree;
 pub mod sdk_assembly;
 
 use crate::tree::Entries;
