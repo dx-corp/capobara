@@ -15,7 +15,7 @@ pub struct Report {
     pub source_file_count: usize,
     pub result: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub public_package_name: Option<String>,
+    public_package_name: Option<String>,
 }
 
 impl From<&Built> for Report {

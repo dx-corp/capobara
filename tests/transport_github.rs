@@ -188,16 +188,17 @@ fn pr_body_carries_complete_provenance_and_bounded_changed_deleted_paths() {
         content_digest: "5".repeat(64),
         publication_eligible: true,
     };
-    let report = Report {
-        copied_paths: (0..25).map(|i| format!("c{i}")).collect(),
-        deleted_paths: (0..25).map(|i| format!("d{i}")).collect(),
-        copied_count: 25,
-        deleted_count: 25,
-        provenance,
-        source_file_count: 0,
-        public_package_name: None,
-        result: "drift_detected".into(),
-    };
+    let report: Report = serde_json::from_value(json!({
+        "copiedPaths": (0..25).map(|i| format!("c{i}")).collect::<Vec<_>>(),
+        "deletedPaths": (0..25).map(|i| format!("d{i}")).collect::<Vec<_>>(),
+        "copiedCount": 25,
+        "deletedCount": 25,
+        "provenance": provenance,
+        "sourceFileCount": 0,
+        "publicPackageName": null,
+        "result": "drift_detected",
+    }))
+    .expect("publication report fixture");
 
     let body = publication_body(&d, &report);
     // Verified byte-for-byte against Node's `publicationBody` output before
