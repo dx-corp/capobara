@@ -3,11 +3,11 @@
   "projection": "capobara",
   "projectionSchemaVersion": 1,
   "sourceRepository": "dx-corp/mono",
-  "sourceSha": "9ead09234385614f3a210ae55e66c51045b917dd",
+  "sourceSha": "492ac6353f040a32a43dc5e5fdfbd1d6e955c8d7",
   "destinationRepository": "dx-corp/capobara",
-  "priorProjectedBase": "ad9170bc1da15f5bfbe6c444401611d33364a96d",
+  "priorProjectedBase": "44c648c5ca9bfa9e59cb6dc9043552ae83514d3b",
   "definitionDigest": "7826c75cbd356dad6c867f2606ebde8b79ef4361353908cf33ada720034ec488",
-  "toolDigest": "8edbdda829386b9333decec48e155a8adee07af4",
+  "toolDigest": "4f92e4ef0348b5541563a122a469f4d0712148a8",
   "contentDigest": "fc08a3b365384b7b5abfa0e4af3ffac77d619b5b849104a542d4867a317b4a28",
   "publicationEligible": true
 }
