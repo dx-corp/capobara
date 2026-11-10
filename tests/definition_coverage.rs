@@ -201,6 +201,8 @@ fn committed_code_definition_loads_with_complete_snapshot_inputs() {
             "rust/Cargo.toml",
             "rust/crates/dex/loop",
             "rust/crates/managed-inference-contract",
+            "rust/tools/borg/sqlite-compat",
+            "rust/workspace-hack-stub",
         ]
     );
 }

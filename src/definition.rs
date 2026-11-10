@@ -603,6 +603,11 @@ pub fn projection_input_roots(
                 "rust/crates/dex/loop".to_string(),
                 "rust/crates/managed-inference-contract".to_string(),
             ]);
+            roots.extend(
+                crate::modes::maestro_public_tree::PUBLIC_CARGO_PATCHES
+                    .iter()
+                    .map(|(path, _)| (*path).to_owned()),
+            );
             roots
         }
         Mode::CopyV1 => {
@@ -854,7 +859,9 @@ mod tests {
                 "scripts/ci/aws-lc-system-env.sh",
                 "rust/Cargo.toml",
                 "rust/crates/dex/loop",
-                "rust/crates/managed-inference-contract"
+                "rust/crates/managed-inference-contract",
+                "rust/tools/borg/sqlite-compat",
+                "rust/workspace-hack-stub"
             ]
         );
     }
