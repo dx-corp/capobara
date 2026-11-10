@@ -44,6 +44,16 @@ directly rather than inheriting them, and this repository carries a
 The Code definition stays outside the general catalog fanout; its dedicated
 workflow owns version checks, prepared-tree guardrails, and auto-merge.
 
+The Code mirror and its scheduled audits opt into `--allow-equivalent-source`.
+When only the source revision changed, this retains the stored receipt after
+rebuilding its recorded source and verifying identical managed files, definition,
+projector, and content. Both source and destination ancestry must remain valid;
+draft receipts cannot qualify. Reports keep that receipt's `provenance.sourceSha`
+and name the newly evaluated revision separately as `evaluatedSourceSha`. No file
+is written and no publication is needed. A changed file, mode, deletion,
+definition, or projector still requires a new projection. Without this flag,
+`verify` continues to require the exact requested source revision.
+
 ## Contributing
 
 Issues are welcome here. Code changes land in `dx-corp/mono` and are

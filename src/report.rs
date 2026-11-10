@@ -16,6 +16,9 @@ pub struct Report {
     pub result: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     public_package_name: Option<String>,
+    /// Requested source whose output was verified equivalent to the retained receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluated_source_sha: Option<String>,
 }
 
 impl From<&Built> for Report {
@@ -29,6 +32,7 @@ impl From<&Built> for Report {
             deleted_count,
             provenance: built.provenance.clone(),
             public_package_name: built.public_package_name.clone(),
+            evaluated_source_sha: None,
             // Node: `entries.size - 1` (the receipt entry is not a source file).
             source_file_count: built.plan.entries.len().saturating_sub(1),
             result: if copied_count + deleted_count > 0 {
@@ -68,6 +72,12 @@ pub fn markdown_summary(
             .to_string(),
         String::new(),
     ];
+    if let Some(evaluated) = &report.evaluated_source_sha {
+        lines.push(format!(
+            "- Evaluated source: {evaluated}; output unchanged, retained stored receipt for {}.",
+            report.provenance.source_sha
+        ));
+    }
     lines.extend(
         built
             .plan

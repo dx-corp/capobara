@@ -257,6 +257,7 @@ pub fn run(args: RunArgs) -> Result<i32> {
         status_output: None,
         markdown_output: step_summary_path(),
         draft: false,
+        allow_equivalent_source: false,
     })?;
     // TODO(task-19): the workflow runs
     // `node scripts/projections/validate.mjs "$PROJECTION" <target>` here
@@ -273,6 +274,7 @@ pub fn run(args: RunArgs) -> Result<i32> {
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     // The workflow runs under `set -euo pipefail`, so `project.mjs verify`
     // reporting drift (exit 1) fails the step. The workflow's own
@@ -415,6 +417,7 @@ pub fn prove_publication(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     contract(
         verified == 0,
