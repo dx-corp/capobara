@@ -66,6 +66,7 @@ pub struct ProjectArgs {
     pub status_output: Option<PathBuf>,
     pub markdown_output: Option<PathBuf>,
     pub draft: bool,
+    pub allow_equivalent_source: bool,
 }
 
 static REMOTE: LazyLock<Regex> = LazyLock::new(|| {
@@ -216,6 +217,10 @@ fn load_stored_receipt(
 /// `catch` sets `process.exitCode = 2` for any thrown error, including a
 /// `verify` provenance mismatch).
 pub fn run(args: ProjectArgs) -> Result<i32> {
+    invalid(
+        !args.allow_equivalent_source || !args.draft,
+        "Equivalent-source verification requires publication-eligible inputs",
+    )?;
     // Step 1: source/target must be absolute and disjoint in one direction
     // (the destination cannot contain the source repository).
     let source = absolutize(&args.source)?;
@@ -335,7 +340,7 @@ pub fn run(args: ProjectArgs) -> Result<i32> {
     let definition_text = loaded.text.as_str();
 
     let (message, exit_code) = with_snapshot(&source, source_sha, &roots, |snapshot_root| {
-        let built = build_projection(
+        let mut built = build_projection(
             BuildInput {
                 definition,
                 definition_text,
@@ -349,6 +354,83 @@ pub fn run(args: ProjectArgs) -> Result<i32> {
             &sdk_assembly::assemble,
         )?;
 
+        let mut evaluated_source_sha = None;
+        if args.allow_equivalent_source
+            && let Some(previous) = &stored
+            && previous.source_sha != source_sha
+            && previous.definition_digest == built.provenance.definition_digest
+            && previous.tool_digest == built.provenance.tool_digest
+            && previous.content_digest == built.provenance.content_digest
+            && built.plan.deleted_paths.is_empty()
+            && built
+                .plan
+                .copied_paths
+                .iter()
+                .all(|path| path == &definition.provenance)
+            && crate::tree::read_entry(&target, &definition.provenance)?.mode == 0o644
+        {
+            // An ancestor SHA plus matching claimed digests is insufficient: the
+            // stored receipt must describe the actual output of its own source.
+            invalid(
+                is_ancestor(&target, &previous.prior_projected_base, &target_head),
+                "Stored projection base is not an ancestor of the destination",
+            )?;
+            let previous_definition = git::git(
+                &source,
+                &[
+                    "show",
+                    &format!(
+                        "{}:config/projections/{}.json",
+                        previous.source_sha, definition.name
+                    ),
+                ],
+            )?;
+            invalid(
+                definition_digest(&previous_definition)? == previous.definition_digest,
+                "Stored provenance definition differs from source revision",
+            )?;
+            invalid(
+                tooldigest::at_revision(&source, &previous.source_sha)? == previous.tool_digest,
+                "Stored provenance projector differs from source revision",
+            )?;
+            with_snapshot(&source, &previous.source_sha, &roots, |previous_root| {
+                let verified = build_projection(
+                    BuildInput {
+                        definition,
+                        definition_text,
+                        source_root: previous_root,
+                        target_root: &target,
+                        source_sha: &previous.source_sha,
+                        prior_projected_base: &previous.prior_projected_base,
+                        tool_digest,
+                        publication_eligible,
+                    },
+                    &sdk_assembly::assemble,
+                )?;
+                verified.provenance.verify_against(previous)?;
+                invalid(
+                    verified.plan.deleted_paths.is_empty()
+                        && verified
+                            .plan
+                            .copied_paths
+                            .iter()
+                            .all(|path| path == &definition.provenance),
+                    "Stored source output differs from destination",
+                )?;
+                Ok(())
+            })?;
+            // Preserve the exact stored bytes (including harmless formatting),
+            // rather than rewriting provenance to claim an unpublished revision.
+            let entry = crate::tree::read_entry(&target, &definition.provenance)?;
+            built
+                .plan
+                .entries
+                .insert(definition.provenance.clone(), entry);
+            built.plan.copied_paths.clear();
+            built.provenance = previous.clone();
+            evaluated_source_sha = Some(source_sha.to_owned());
+        }
+
         if command == ProjectCommand::Verify {
             match &stored {
                 None => return Err(Error::Invalid("Invalid provenance".into())),
@@ -356,7 +438,8 @@ pub fn run(args: ProjectArgs) -> Result<i32> {
             }
         }
 
-        let report = Report::from(&built);
+        let mut report = Report::from(&built);
+        report.evaluated_source_sha = evaluated_source_sha;
         for path in args.report.iter().chain(args.status_output.iter()) {
             write_json_report(path, &report)?;
         }
@@ -364,7 +447,7 @@ pub fn run(args: ProjectArgs) -> Result<i32> {
             let markdown = markdown_summary(
                 definition,
                 source_sha,
-                prior_projected_base.as_str(),
+                &built.provenance.prior_projected_base,
                 &built,
                 &report,
             );

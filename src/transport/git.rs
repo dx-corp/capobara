@@ -251,6 +251,7 @@ pub fn assert_candidate_matches_main_projection(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     let expected_report = read_report(&expected_report_path)?;
 
@@ -492,6 +493,7 @@ pub fn publish_prepared_tree(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     // Fail closed on a drifting `verify`: `?` above propagates only an
     // `Err`, while drift is `Ok(1)`. See this function's doc comment for
@@ -555,6 +557,7 @@ pub fn publish_prepared_tree(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     let planned = read_report(&planned_path)?;
     contract(

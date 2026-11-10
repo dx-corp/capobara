@@ -163,6 +163,7 @@ pub fn preflight_publication(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     // Node spawns `project.mjs verify` with `execFileSync`, which throws on
     // any non-zero exit -- including the exit code 1 `verify` uses to
@@ -229,6 +230,7 @@ pub fn preflight_publication(
         status_output: None,
         markdown_output: None,
         draft: false,
+        allow_equivalent_source: false,
     })?;
     let planned = read_report(&planned_path)?;
     for key in PLAN_KEYS {

@@ -34,6 +34,145 @@ fn definition_json(name: &str) -> String {
 }
 
 #[test]
+fn equivalent_source_retains_a_verified_receipt_without_writing_and_exact_verify_stays_strict() {
+    let source = Repo::init("https://github.com/dx-corp/mono.git");
+    source.write(
+        "config/projections/sample.json",
+        definition_json("sample").as_bytes(),
+    );
+    source.write("pkg/src/a.rs", b"public payload");
+    source.write("rust/tools/capobara/src/lib.rs", b"// fixture tool");
+    let published = source.commit("published source");
+    let tool = source.git(&["rev-parse", "HEAD:rust/tools/capobara"]);
+    let target = Repo::init("https://github.com/dx-corp/sample.git");
+    target.write("SECURITY.md", b"destination owned");
+    target.set_remote_main(&target.commit("destination"));
+    let reports = tempfile::tempdir().unwrap();
+    let report = reports.path().join("equivalence-report.json");
+    let run = |command: &str, sha: &str, equivalent: bool| {
+        let mut cmd = capobara();
+        cmd.env("CAPOBARA_TREE_ID_OVERRIDE", tool.trim())
+            .args([command, "--definition"])
+            .arg(source.path().join("config/projections/sample.json"))
+            .arg("--source")
+            .arg(source.path())
+            .args(["--source-sha", sha, "--target"])
+            .arg(target.path())
+            .arg("--report")
+            .arg(&report);
+        if equivalent {
+            cmd.arg("--allow-equivalent-source");
+        }
+        cmd.output().unwrap()
+    };
+    assert!(run("apply", &published, false).status.success());
+    target.set_remote_main(&target.commit("published projection"));
+    let receipt_path = target.path().join(".repository-projection.json");
+    let receipt = std::fs::read(&receipt_path).unwrap();
+    source.write("private-note", b"private-only change");
+    let current = source.commit("private-only change");
+    for command in ["check", "apply", "verify"] {
+        let output = run(command, &current, true);
+        assert!(
+            output.status.success(),
+            "{command}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(std::fs::read(&receipt_path).unwrap(), receipt);
+        assert!(target.git(&["status", "--porcelain"]).trim().is_empty());
+        let status: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&report).unwrap()).unwrap();
+        assert_eq!(status["result"], "in_sync");
+        assert_eq!(status["provenance"]["sourceSha"], published);
+        assert_eq!(status["evaluatedSourceSha"], current);
+    }
+    let exact = run("verify", &current, false);
+    assert_eq!(exact.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&exact.stderr).contains("Provenance mismatch: sourceSha"));
+
+    let original: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+    for field in ["definitionDigest", "toolDigest", "contentDigest"] {
+        let mut tampered = original.clone();
+        tampered[field] = serde_json::json!("0".repeat(40));
+        std::fs::write(&receipt_path, serde_json::to_vec(&tampered).unwrap()).unwrap();
+        assert_eq!(
+            run("check", &current, true).status.code(),
+            Some(1),
+            "{field}"
+        );
+    }
+    for (field, value) in [
+        ("publicationEligible", serde_json::json!(false)),
+        ("projection", serde_json::json!("wrong-identity")),
+        ("priorProjectedBase", serde_json::json!("0".repeat(40))),
+    ] {
+        let mut tampered = original.clone();
+        tampered[field] = value;
+        std::fs::write(&receipt_path, serde_json::to_vec(&tampered).unwrap()).unwrap();
+        assert_eq!(
+            run("check", &current, true).status.code(),
+            Some(2),
+            "{field}"
+        );
+    }
+    std::fs::write(&receipt_path, &receipt).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    for path in [&receipt_path, &target.path().join("src/a.rs")] {
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(run("check", &current, true).status.code(), Some(1));
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    }
+    target.write("SECURITY.md", b"public-owned edit must survive");
+    assert!(run("apply", &current, true).status.success());
+    assert_eq!(
+        std::fs::read(target.path().join("SECURITY.md")).unwrap(),
+        b"public-owned edit must survive"
+    );
+    target.write("SECURITY.md", b"destination owned");
+
+    // Claiming an older ancestor produced these bytes is not enough: rebuild it.
+    source.git(&["checkout", "--detach", &published]);
+    source.write("pkg/src/a.rs", b"different old payload");
+    let forged_source = source.commit("different source");
+    source.git(&["checkout", "--detach", &current]);
+    source.git(&[
+        "merge",
+        "--no-ff",
+        "-s",
+        "ours",
+        "-m",
+        "retain current payload",
+        &forged_source,
+    ]);
+    let merged = source.head();
+    let mut forged: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+    forged["sourceSha"] = serde_json::json!(forged_source);
+    std::fs::write(&receipt_path, serde_json::to_vec_pretty(&forged).unwrap()).unwrap();
+    let output = run("check", &merged, true);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Provenance mismatch: contentDigest"));
+    std::fs::write(&receipt_path, &receipt).unwrap();
+
+    target.write("src/a.rs", b"public drift");
+    assert_eq!(run("check", &merged, true).status.code(), Some(1));
+    target.write("src/a.rs", b"public payload");
+    target.write("src/stale.rs", b"stale file");
+    assert_eq!(run("check", &merged, true).status.code(), Some(1));
+    std::fs::remove_file(target.path().join("src/stale.rs")).unwrap();
+    source.write("pkg/src/a.rs", b"changed public payload");
+    let changed = source.commit("public change");
+    assert_eq!(run("check", &changed, true).status.code(), Some(1));
+    assert!(run("apply", &changed, true).status.success());
+    assert_eq!(
+        std::fs::read(target.path().join("src/a.rs")).unwrap(),
+        b"changed public payload"
+    );
+    assert!(run("verify", &changed, false).status.success());
+    source.git(&["checkout", "--detach", &published]);
+    assert_eq!(run("check", &published, true).status.code(), Some(2));
+}
+
+#[test]
 fn production_cli_verifies_committed_definition_reports_drift_and_rejects_malformed_prior_provenance()
  {
     let source = Repo::init("https://github.com/dx-corp/mono.git");

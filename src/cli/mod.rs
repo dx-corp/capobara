@@ -38,6 +38,9 @@ pub struct ProjectCliArgs {
     pub markdown_output: Option<PathBuf>,
     #[arg(long)]
     pub draft: bool,
+    /// Retain an older receipt only after rebuilding and verifying equivalent committed output.
+    #[arg(long)]
+    pub allow_equivalent_source: bool,
 }
 
 impl ProjectCliArgs {
@@ -52,6 +55,7 @@ impl ProjectCliArgs {
             status_output: self.status_output,
             markdown_output: self.markdown_output,
             draft: self.draft,
+            allow_equivalent_source: self.allow_equivalent_source,
         }
     }
 }
