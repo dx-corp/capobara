@@ -18,6 +18,11 @@ use crate::tree::{
 use crate::{Error, Result, contract};
 use boundary::*;
 
+pub(crate) const PUBLIC_CARGO_PATCHES: [(&str, &str); 2] = [
+    ("rust/tools/borg/sqlite-compat", "vendor/sqlite-compat"),
+    ("rust/workspace-hack-stub", "vendor/workspace-hack-stub"),
+];
+
 fn parse_json(bytes: &[u8]) -> Result<Json> {
     serde_json::from_slice(bytes)
         .map_err(|e| Error::Contract(format!("Invalid public projection JSON: {e}")))
@@ -258,7 +263,16 @@ fn sanitize_cargo(path: &str, content: &str) -> Result<String> {
                 !private_cerebro_trace(&clean),
                 "Cargo.toml still names Cerebro after sanitization; update the public projection",
             )?;
-            replace_regex(&clean, r#"(?m)^test-world = \{ git = "https://github\.com/evalops/test-world", rev = "[^"]+" \}\r?\n"#, "")?
+            let clean = replace_regex(
+                &clean,
+                r#"(?m)^test-world = \{ git = "https://github\.com/evalops/test-world", rev = "[^"]+" \}\r?\n"#,
+                "",
+            )?;
+            PUBLIC_CARGO_PATCHES
+                .into_iter()
+                .fold(clean, |manifest, (path, public_path)| {
+                    manifest.replacen(&format!("../../{path}"), public_path, 1)
+                })
                 .replacen("\"vendor/*\"]", "\"vendor/*\", \"vendor/dex-loop\"]", 1)
         }
         "packages/ambient-agent-rs/Cargo.toml" => {
@@ -334,14 +348,24 @@ fn sanitize_dockerfile(content: &str) -> Result<String> {
         start.is_some() && end.is_some() && content.contains("COPY --from=planner /rust /rust"),
         "Maestro Dockerfile dependency context changed; update its public projection",
     )?;
-    let public_copy = "COPY vendor/dex-loop ./vendor/dex-loop\nCOPY vendor/managed-inference-contract ./vendor/managed-inference-contract\n";
+    let mut public_copy = String::from(
+        "COPY vendor/dex-loop ./vendor/dex-loop\nCOPY vendor/managed-inference-contract ./vendor/managed-inference-contract\n",
+    );
+    for (path, public_path) in PUBLIC_CARGO_PATCHES {
+        if content.contains(&format!(
+            "COPY --from=dex-loop-workspace {} ",
+            &path["rust".len()..]
+        )) {
+            public_copy.push_str(&format!("COPY {public_path} ./{public_path}\n"));
+        }
+    }
     let output = format!(
         "{}{}{}",
         &content[..start.expect("checked")],
         public_copy,
         &content[end.expect("checked")..]
     )
-    .replacen("COPY --from=planner /rust /rust\n", public_copy, 1);
+    .replacen("COPY --from=planner /rust /rust\n", &public_copy, 1);
     let crate_copy = "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n";
     let platform_copy = "COPY --from=planner /platform /platform\n";
     contract(
@@ -728,6 +752,42 @@ mod tests {
         assert!(sanitized.contains("\"vendor/*\", \"vendor/dex-loop\"]"));
         assert!(sanitize_cargo("Cargo.toml", "test-world = { changed = true }\n").is_err());
         assert!(sanitize_cargo("packages/dex-host-rs/Cargo.toml", "changed").is_err());
+    }
+
+    #[test]
+    fn cargo_patches_and_docker_inputs_stay_inside_the_public_tree() {
+        let manifest = concat!(
+            "[patch.crates-io]\n",
+            "libsqlite3-sys = { path = \"../../rust/tools/borg/sqlite-compat\" }\n",
+            "evalops-workspace-hack = { path = \"../../rust/workspace-hack-stub\" }\n"
+        );
+        let sanitized = sanitize_cargo("Cargo.toml", manifest).unwrap();
+        assert!(sanitized.contains("path = \"vendor/sqlite-compat\""));
+        assert!(sanitized.contains("path = \"vendor/workspace-hack-stub\""));
+        assert!(!sanitized.contains("../../rust/"));
+        assert_eq!(sanitize_cargo("Cargo.toml", &sanitized).unwrap(), sanitized);
+
+        let dockerfile = concat!(
+            "FROM chef AS planner\n",
+            "COPY --from=dex-loop-workspace /crates/dex/loop ./vendor/dex-loop\n",
+            "COPY --from=dex-loop-workspace /tools/borg/sqlite-compat /rust/tools/borg/sqlite-compat\n",
+            "COPY --from=dex-loop-workspace /workspace-hack-stub /rust/workspace-hack-stub\n",
+            "COPY vendor/rquickjs-core-0.13.0 ./vendor/rquickjs-core-0.13.0\n",
+            "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n",
+            "FROM chef AS native\n",
+            "COPY --from=planner /rust /rust\n",
+            "COPY --from=planner /platform /platform\n",
+            "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n"
+        );
+        let sanitized = sanitize_dockerfile(dockerfile).unwrap();
+        for stage in sanitized.split("FROM chef AS ").skip(1) {
+            assert!(stage.contains("COPY vendor/sqlite-compat ./vendor/sqlite-compat\n"));
+            assert!(
+                stage.contains("COPY vendor/workspace-hack-stub ./vendor/workspace-hack-stub\n")
+            );
+        }
+        assert!(!sanitized.contains("/rust"));
+        assert!(!sanitized.contains("dex-loop-workspace"));
     }
 
     #[test]

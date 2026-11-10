@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
 
+use super::PUBLIC_CARGO_PATCHES;
 use crate::tree::{Entries, contained_path, files_under, read_entry};
 use crate::{Error, Result};
 
@@ -12,6 +13,7 @@ const CRATES: [(&str, &str); 2] = [
 ];
 
 pub(super) fn collect(source: &Path, entries: &mut Entries) -> Result<()> {
+    collect_patches(source, entries)?;
     if !contained_path(source, "packages/dex-host-rs/Cargo.toml")?.exists() {
         return Ok(());
     }
@@ -39,6 +41,31 @@ pub(super) fn collect(source: &Path, entries: &mut Entries) -> Result<()> {
                 entry.content = public_dex_loop_readme(&entry.content);
             }
             entries.insert(format!("vendor/{name}/{path}"), entry);
+        }
+    }
+    Ok(())
+}
+
+fn collect_patches(source: &Path, entries: &mut Entries) -> Result<()> {
+    if !contained_path(source, "Cargo.toml")?.exists() {
+        return Ok(());
+    }
+    let manifest = read_entry(source, "Cargo.toml")?;
+    let manifest = String::from_utf8_lossy(&manifest.content);
+    let mono = source
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| Error::Contract("Maestro source has no containing Rust workspace".into()))?;
+    for (path, public_path) in PUBLIC_CARGO_PATCHES {
+        if !manifest.contains(&format!("../../{path}")) {
+            continue;
+        }
+        let crate_root = contained_path(mono, path)?;
+        for file in ["Cargo.toml", "src/lib.rs"] {
+            entries.insert(
+                format!("{public_path}/{file}"),
+                read_entry(&crate_root, file)?,
+            );
         }
     }
     Ok(())
@@ -241,6 +268,44 @@ mod tests {
         }
         fs::write(rust.join("Cargo.toml"), WORKSPACE).unwrap();
         (temp, source, rust)
+    }
+
+    #[test]
+    fn collection_carries_referenced_cargo_patch_sources_and_requires_them() {
+        let (_temp, source, rust) = fixture();
+        fs::write(
+            source.join("Cargo.toml"),
+            concat!(
+                "[patch.crates-io]\n",
+                "libsqlite3-sys = { path = \"../../rust/tools/borg/sqlite-compat\" }\n",
+                "evalops-workspace-hack = { path = \"../../rust/workspace-hack-stub\" }\n"
+            ),
+        )
+        .unwrap();
+        let patches = [
+            ("tools/borg/sqlite-compat", "sqlite-compat"),
+            ("workspace-hack-stub", "workspace-hack-stub"),
+        ];
+        for (private, _) in patches {
+            fs::create_dir_all(rust.join(private).join("src")).unwrap();
+            for (path, content) in [("Cargo.toml", "[package]\n"), ("src/lib.rs", "// source\n")] {
+                fs::write(rust.join(private).join(path), content).unwrap();
+            }
+            fs::write(rust.join(private).join("private.txt"), "must stay private").unwrap();
+        }
+        let mut entries = Entries::new();
+        collect(&source, &mut entries).unwrap();
+        for (private, public) in patches {
+            for path in ["Cargo.toml", "src/lib.rs"] {
+                assert_eq!(
+                    entries[&format!("vendor/{public}/{path}")].content,
+                    fs::read(rust.join(private).join(path)).unwrap()
+                );
+            }
+            assert!(!entries.contains_key(&format!("vendor/{public}/private.txt")));
+        }
+        fs::remove_file(rust.join("workspace-hack-stub/src/lib.rs")).unwrap();
+        assert!(collect(&source, &mut Entries::new()).is_err());
     }
 
     #[test]
