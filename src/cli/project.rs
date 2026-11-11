@@ -66,7 +66,7 @@ pub struct ProjectArgs {
     pub status_output: Option<PathBuf>,
     pub markdown_output: Option<PathBuf>,
     pub draft: bool,
-    pub allow_equivalent_source: bool,
+    pub(crate) allow_equivalent_source: bool,
 }
 
 static REMOTE: LazyLock<Regex> = LazyLock::new(|| {

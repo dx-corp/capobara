@@ -40,7 +40,7 @@ pub struct ProjectCliArgs {
     pub draft: bool,
     /// Retain an older receipt only after rebuilding and verifying equivalent committed output.
     #[arg(long)]
-    pub allow_equivalent_source: bool,
+    allow_equivalent_source: bool,
 }
 
 impl ProjectCliArgs {

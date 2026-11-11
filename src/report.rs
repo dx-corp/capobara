@@ -18,7 +18,7 @@ pub struct Report {
     public_package_name: Option<String>,
     /// Requested source whose output was verified equivalent to the retained receipt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evaluated_source_sha: Option<String>,
+    pub(crate) evaluated_source_sha: Option<String>,
 }
 
 impl From<&Built> for Report {
