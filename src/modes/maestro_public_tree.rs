@@ -408,17 +408,20 @@ fn public_content(source: &Path, path: &str, original: &[u8], package: &[u8]) ->
     if let Some(replacement) = replacement_path(path) {
         return Ok(read_entry(source, replacement)?.content);
     }
-    if path == "vendor/tls-provenance.json" {
+    if matches!(
+        path,
+        "vendor/tls-provenance.json" | "vendor/testcontainers-provenance.json"
+    ) {
         let Json::Array(mut records) = parse_json(original)? else {
             return Err(Error::Contract(
-                "TLS provenance consumer schema changed; update the public projection".into(),
+                "Vendored provenance consumer schema changed; update the public projection".into(),
             ));
         };
         for record in &mut records {
             contract(
                 matches!(record, Json::Object(_))
                     && matches!(get(record, "workspaces"), Some(Json::Array(items)) if items.iter().all(|v| matches!(v, Json::String(_)))),
-                "TLS provenance consumer schema changed; update the public projection",
+                "Vendored provenance consumer schema changed; update the public projection",
             )?;
             remove(record, "workspaces");
         }
@@ -822,6 +825,48 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn vendored_provenance_preserves_artifact_identity_and_unknown_fields() {
+        let source = tempfile::tempdir().unwrap();
+        let original = br#"[{"archive_sha256":"abc","workspaces":["rust","platform/cerebro"],"upstream":{"rev":"123"},"extra":true}]"#;
+        let expected = serde_json::json!([{
+            "archive_sha256": "abc", "upstream": {"rev": "123"}, "extra": true
+        }]);
+        for path in [
+            "vendor/tls-provenance.json",
+            "vendor/testcontainers-provenance.json",
+        ] {
+            let output = public_content(source.path(), path, original, b"").unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&output).unwrap(),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn vendored_provenance_schema_drift_refuses_publication() {
+        let source = tempfile::tempdir().unwrap();
+        for path in [
+            "vendor/tls-provenance.json",
+            "vendor/testcontainers-provenance.json",
+        ] {
+            for malformed in [
+                "{}",
+                "[null]",
+                "[{}]",
+                r#"[{"workspaces":42}]"#,
+                r#"[{"workspaces":["rust",1]}]"#,
+            ] {
+                assert!(
+                    public_content(source.path(), path, malformed.as_bytes(), b"").is_err(),
+                    "{path}: {malformed}"
+                );
+            }
+        }
     }
 
     #[test]
