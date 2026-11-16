@@ -219,6 +219,14 @@ fn public_dex_loop_readme(content: &[u8]) -> Vec<u8> {
             "From the public repository root:",
             1,
         )
+        .replacen(
+            concat!(
+                "Agents run Rust commands on dev-desktop through cargo-slot; see the\n",
+                "[build recipes](../../../../docs/development.md#rust-builds-for-agents)."
+            ),
+            "Review the [build guidance](../../docs/BUILD_TESTING.md) before running these checks.",
+            1,
+        )
         .replace(
             "--manifest-path rust/Cargo.toml -p dex-loop",
             "--manifest-path vendor/dex-loop/Cargo.toml -p dex-loop",
@@ -345,13 +353,18 @@ mod tests {
             "Policy remains. In the hosted `dex-tools` policy, private text\n",
             "[policy checks](../tools/src/policy.rs).\n\n",
             "The [filesystem host tests](private) old guidance\n\n## Checks\n",
+            "Agents run Rust commands on dev-desktop through cargo-slot; see the\n",
+            "[build recipes](../../../../docs/development.md#rust-builds-for-agents).\n\n",
             "From the repository root, after the same build-capacity check:\n",
             "cargo test --manifest-path rust/Cargo.toml -p dex-loop\n",
             "cargo clippy --manifest-path rust/Cargo.toml -p dex-loop\n"
         );
         let output = String::from_utf8(public_dex_loop_readme(input.as_bytes())).unwrap();
         assert!(output.starts_with("Policy remains.\n\nThe [filesystem host tests](../../packages/dex-host-rs/tests/recovery_contract.rs)\n"));
-        assert!(output.contains("cargo test --locked -p maestro-dex-host --test recovery_contract\n```\n\n## Checks\nFrom the public repository root:"));
+        assert!(output.contains("cargo test --locked -p maestro-dex-host --test recovery_contract\n```\n\n## Checks\nReview the [build guidance](../../docs/BUILD_TESTING.md) before running these checks.\n\nFrom the public repository root:"));
+        assert!(!output.contains("dev-desktop"));
+        assert!(!output.contains("cargo-slot"));
+        assert!(!output.contains("docs/development.md"));
         assert_eq!(
             output
                 .matches("--manifest-path vendor/dex-loop/Cargo.toml -p dex-loop")
