@@ -365,7 +365,8 @@ fn sanitize_dockerfile(content: &str) -> Result<String> {
         public_copy,
         &content[end.expect("checked")..]
     )
-    .replacen("COPY --from=planner /rust /rust\n", &public_copy, 1);
+    .replacen("COPY --from=planner /rust /rust\n", &public_copy, 1)
+    .replacen("COPY --from=planner /contracts /contracts\n", "", 1);
     let crate_copy = "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n";
     let platform_copy = "COPY --from=planner /platform /platform\n";
     contract(
@@ -775,11 +776,13 @@ mod tests {
             "COPY --from=dex-loop-workspace /crates/dex/loop ./vendor/dex-loop\n",
             "COPY --from=dex-loop-workspace /tools/borg/sqlite-compat /rust/tools/borg/sqlite-compat\n",
             "COPY --from=dex-loop-workspace /workspace-hack-stub /rust/workspace-hack-stub\n",
+            "COPY --from=dex-provider-contract-source /mcp-providers.v1.toml /contracts/dex/mcp-providers.v1.toml\n",
             "COPY vendor/rquickjs-core-0.13.0 ./vendor/rquickjs-core-0.13.0\n",
             "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n",
             "FROM chef AS native\n",
             "COPY --from=planner /rust /rust\n",
             "COPY --from=planner /platform /platform\n",
+            "COPY --from=planner /contracts /contracts\n",
             "COPY packages/cerebro-host-rs ./packages/cerebro-host-rs\n"
         );
         let sanitized = sanitize_dockerfile(dockerfile).unwrap();
@@ -790,6 +793,7 @@ mod tests {
             );
         }
         assert!(!sanitized.contains("/rust"));
+        assert!(!sanitized.contains("/contracts"));
         assert!(!sanitized.contains("dex-loop-workspace"));
     }
 
